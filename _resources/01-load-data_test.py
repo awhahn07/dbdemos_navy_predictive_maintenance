@@ -41,17 +41,18 @@ def cleanup_folder(path):
 
 # COMMAND ----------
 
-data_downloaded = False
+data_downloaded = False 
+
 # if not data_exists:
 #     try:
-#         DBDemos.download_file_from_git(folder+'/historical_turbine_status', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/historical_turbine_status")
-#         DBDemos.download_file_from_git(folder+'/parts', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/parts")
-#         DBDemos.download_file_from_git(folder+'/turbine', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/turbine")
-#         DBDemos.download_file_from_git(folder+'/incoming_data', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/incoming_data")
+#         DBDemos.download_file_from_git(folder+'/historical_turbine_status', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/historical_turbine_status")
+#         DBDemos.download_file_from_git(folder+'/parts', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/parts")
+#         DBDemos.download_file_from_git(folder+'/turbine', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/turbine")
+#         DBDemos.download_file_from_git(folder+'/incoming_data', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/incoming_data")
+#         DBDemos.download_file_from_git(folder+'/ship_meta', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/ship_meta")
 #         data_downloaded = True
 #     except Exception as e: 
-#         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")    
-
+#         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")   
 
 # COMMAND ----------
 

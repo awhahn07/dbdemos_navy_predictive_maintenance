@@ -44,6 +44,8 @@ from databricks.sdk.service import jobs, pipelines, dashboards
 # COMMAND ----------
 
 # DBTITLE 1,Init
+from pathlib import Path
+
 # Field Eng Shared UC Cluster
 uc_table_creator = "0601-182128-dcbte59m"
 
@@ -53,8 +55,10 @@ w = WorkspaceClient()
 # Get current user name 
 user_name = w.current_user.me().user_name
 
-# Create base notebook path (path to project directory in workspace)
-notebook_base = f'/Workspace/Users/{user_name}/lakehouse_navy_PdM_v2'
+# Create base notebook path (path to project directory in workspace) 
+current_notebook = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+notebook_base = str(Path(notebook_path).parent)
+# notebook_base = f'/Workspace/Users/{user_name}/lakehouse_navy_PdM_v2'
 
 # Get user First and Last Name
 name_regex = r'^(\w+)\.(\w+)@'

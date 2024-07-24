@@ -50,7 +50,19 @@ data_downloaded = False
 #         DBDemos.download_file_from_git(folder+'/incoming_data', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/incoming_data")
 #         data_downloaded = True
 #     except Exception as e: 
-#         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")    
+#         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")  
+
+if not data_exists:
+  if not reset_all_data:
+    try:
+        DBDemos.download_file_from_git(folder+'/historical_turbine_status', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/historical_turbine_status")
+        DBDemos.download_file_from_git(folder+'/parts', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/parts")
+        DBDemos.download_file_from_git(folder+'/turbine', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/turbine")
+        DBDemos.download_file_from_git(folder+'/incoming_data', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/incoming_data")
+        DBDemos.download_file_from_git(folder+'/ship_meta', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/ship_meta")
+        data_downloaded = True
+    except Exception as e: 
+        print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")     
 
 
 # COMMAND ----------
@@ -160,7 +172,7 @@ current_time = int(time.time()) - 3600*30
 #Sec between 2 metrics
 frequency_sec = 10
 #X points per turbine (1 point per frequency_sec second)
-sample_size = 2125
+sample_size = 2152
 turbine_count = 204
 dfs = []
 

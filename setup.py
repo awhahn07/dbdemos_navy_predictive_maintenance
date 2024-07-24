@@ -57,7 +57,7 @@ user_name = w.current_user.me().user_name
 
 # Create base notebook path (path to project directory in workspace) 
 current_notebook = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
-notebook_base = str(Path(notebook_path).parent)
+notebook_base = str(Path(current_notebook).parent)
 # notebook_base = f'/Workspace/Users/{user_name}/lakehouse_navy_PdM_v2'
 
 # Get user First and Last Name
@@ -91,7 +91,7 @@ clusters = [
                 "min_workers": 1,
                 "max_workers": 5,
                 "mode": "ENHANCED"
-            })
+                })
         )]
 
 def get_pipeline_id_by_name(workspace_client: WorkspaceClient, pipeline_name: str):
@@ -222,7 +222,7 @@ tasks = [
         },
         "source": "WORKSPACE"
       },
-      "existing_cluster_id": uc_table_creator,
+      # "existing_cluster_id": uc_table_creator,
       "timeout_seconds": 0,
       "email_notifications": {},
     }),
@@ -270,7 +270,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/05-Supply-Optimization/05.1_Optimize_Transportation",
         "source": "WORKSPACE"
       },
-      "existing_cluster_id": uc_table_creator,
+      # "existing_cluster_id": uc_table_creator,
       "timeout_seconds": 0,
       "email_notifications": {}
     }),  

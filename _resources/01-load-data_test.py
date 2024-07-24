@@ -12,6 +12,11 @@ dbutils.widgets.dropdown("reset_all_data", "false", ["true", "false"], "Reset al
 
 # COMMAND ----------
 
+db = dbName = schema = 'test'
+volume_name = 'navy_test'
+
+# COMMAND ----------
+
 # MAGIC %run ./00-global-setup-v2
 
 # COMMAND ----------
@@ -162,12 +167,12 @@ current_time = int(time.time()) - 3600*30
 frequency_sec = 10
 #X points per turbine (1 point per frequency_sec second)
 sample_size = 2125
-turbine_count = 512
+training_turbine_count = 512
 dfs = []
 
 # COMMAND ----------
 
-def generate_turbine_data(turbine):
+def generate_turbine_data(turbine, turbine_count):
   rd = random.Random()
   rd.seed(turbine)
   damaged = turbine > turbine_count*0.7
@@ -208,6 +213,7 @@ def generate_turbine_data(turbine):
       damaged_sensor = True
     else:
       damaged_sensor = False
+    
     plot = turbine == 0
     df['sensor_'+s['name']] = generate_sensor_data(turbine, s, damaged_sensor, sample_size, plot)
 
@@ -236,14 +242,14 @@ from typing import Iterator
 import pandas as pd
 from pyspark.sql.functions import pandas_udf, col  
 
-df_schema=spark.createDataFrame(generate_turbine_data(0)) 
+df_schema=spark.createDataFrame(generate_turbine_data(0, 1)) 
 
-def generate_turbine(iterator: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
+def generate_turbine(iterator: Iterator[pd.DataFrame], turbine_count) -> Iterator[pd.DataFrame]:
   for pdf in iterator:
     for i, row in pdf.iterrows():
-      yield generate_turbine_data(row["id"])
+      yield generate_turbine_data(row["id"], turbine_count)
 
-spark_df = spark.range(0, turbine_count).repartition(int(turbine_count/10)).mapInPandas(generate_turbine, schema=df_schema.schema)
+spark_df = spark.range(0, training_turbine_count).repartition(int(training_turbine_count/10)).mapInPandas(lambda iterator: generate_turbine(iterator, training_turbine_count), schema=df_schema.schema)
 spark_df = spark_df.cache()
 
 # COMMAND ----------
@@ -256,6 +262,8 @@ spark_df = spark_df.cache()
 
 from pyspark.sql.functions import lit
 from pyspark.sql.functions import monotonically_increasing_id, floor, lit
+
+#Read this from GIT
 
 file_location = "/FileStore/tables/ahahn/US_ships_homeport.csv"
 ships = spark.read.format("csv") \
@@ -281,10 +289,12 @@ root_folder = folder
 folder_sensor = root_folder+'/incoming_data'
 
 # Total of 204 real time sensors
-incoming_turbines = num_ships * 4
+incoming_turbines = 512
+#incoming_turbines = num_ships * 4
 
-incoming_df = spark.range(0, turbine_count).repartition(int(turbine_count/10)).mapInPandas(generate_turbine, schema=df_schema.schema)
+incoming_df = spark.range(0, incoming_turbines).repartition(int(incoming_turbines/10)).mapInPandas(lambda iterator: generate_turbine(iterator, incoming_turbines), schema=df_schema.schema)
 incoming_df = incoming_df.cache()
+
 
 incoming_df.drop('damaged').drop('abnormal_sensor').orderBy('timestamp').repartition(100).write.mode('overwrite').format('parquet').save(folder_sensor)
 
@@ -305,13 +315,19 @@ cleanup(folder_sensor)
 
 # COMMAND ----------
 
-sensor = (spark.read.format('json').load(folder_sensor)
-          .drop('end_time')
+sensor = (incoming_df.drop('end_time')
           .drop('start_time')
           .drop('abnormal_sensor')
           .withColumn('model', lit('LM2500'))
           .withColumn('join_key', monotonically_increasing_id() % num_ships)
-          )
+        )
+# sensor = (spark.read.format('json').load(folder_sensor)
+#           .drop('end_time')
+#           .drop('start_time')
+#           .drop('abnormal_sensor')
+#           .withColumn('model', lit('LM2500'))
+#           .withColumn('join_key', monotonically_increasing_id() % num_ships)
+#           )
 
 # Assign turbine ID to ship metadata
 ship_meta = ships.join(sensor, 'join_key').drop('join_key')
@@ -319,6 +335,8 @@ ship_meta = ships.join(sensor, 'join_key').drop('join_key')
 folder_ship = root_folder+'/ship_meta'
 ship_meta.write.mode('overwrite').format('json').save(folder_ship)
 cleanup(folder_ship)
+
+# ship_meta.select('turbine_id').distinct().count()
 
 # COMMAND ----------
 
@@ -351,6 +369,7 @@ fake_latlng = F.udf(lambda: list(faker.local_latlng(country_code = 'US')), Array
 rd = random.Random()
 rd.seed(0)
 folder = root_folder+'/turbine'
+#TODO Update to erase erroneous fields
 (spark_df.select('turbine_id').drop_duplicates()
    .withColumn('fake_lat_long', fake_latlng())
    .withColumn('model', F.lit('EpicWind'))

@@ -218,7 +218,7 @@ transport_optimization(pdf)
 
 # COMMAND ----------
 
-spark.conf.set("spark.databricks.optimizer.adaptive.enabled", "false")
+# spark.conf.set("spark.databricks.optimizer.adaptive.enabled", "false")
 n_tasks = lp_table.select("type").distinct().count()
 
 optimal_transport_df = (

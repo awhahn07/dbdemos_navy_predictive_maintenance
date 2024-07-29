@@ -82,9 +82,7 @@ class MaintenanceEmptyModel(mlflow.pyfunc.PythonModel):
  
 #Enable Unity Catalog with mlflow registry
 mlflow.set_registry_uri('databricks-uc')
-
-# TODO Change Model Name
-model_name = "navy_turbine_maintenance" #model_name = "dbdemos_turbine_maintenance"
+model_name = "navy_turbine_maintenance" 
 
 #Only register empty model if model doesn't exist yet
 client = mlflow.tracking.MlflowClient()
@@ -94,7 +92,7 @@ except Exception as e:
     if "RESOURCE_DOES_NOT_EXIST" in str(e):
         print("Model doesn't exist - saving an empty one")
         # setup the experiment folder
-        DBDemos.init_experiment_for_batch("lakehouse-navy-PdM", "navy_turbine_maintenance")
+        DBDemos.init_experiment_for_batch("navy_turbine_maintenance", "predictive_maintenance_mock")
         # save the model
         churn_model = MaintenanceEmptyModel()
         import pandas as pd
@@ -172,7 +170,7 @@ current_time = int(time.time()) - 3600*30
 #Sec between 2 metrics
 frequency_sec = 10
 #X points per turbine (1 point per frequency_sec second)
-sample_size = 2152
+sample_size = 2125
 turbine_count = 204
 dfs = []
 

@@ -126,14 +126,14 @@
 -- COMMAND ----------
 
 -- DBTITLE 1,Wind Turbine metadata:
--- MAGIC %python
--- MAGIC spark.read.json("/Volumes/ahahn_demo/dbdemos_navy_pdm_test/navy_raw_landing/turbine").display()
+-- %python
+-- spark.read.json("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/turbine").display()
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Wind Turbine sensor data
--- MAGIC %python
--- MAGIC display(spark.read.parquet('/Volumes/ahahn_demo/dbdemos_navy_pdm_test/navy_raw_landing/incoming_data'))
+-- %python
+-- display(spark.read.parquet('/Volumes/main/dbdemos_iot_turbine/turbine_raw_landing/incoming_data'))
 
 -- COMMAND ----------
 
@@ -164,7 +164,7 @@ CREATE OR REFRESH STREAMING TABLE turbine (
   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL) 
 )
 COMMENT "Turbine details, with location, wind turbine model type etc"
-SELECT * FROM cloud_files("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/turbine/", "json", map("cloudFiles.inferColumnTypes" , "true"));
+SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/navy_raw_landing/turbine/", "json", map("cloudFiles.inferColumnTypes" , "true"));
 
 -- COMMAND ----------
 
@@ -174,7 +174,7 @@ CREATE OR REFRESH STREAMING TABLE sensor_bronze (
   CONSTRAINT correct_energy EXPECT (energy IS NOT NULL and energy > 0) ON VIOLATION DROP ROW
 )
 COMMENT "Raw sensor data coming from json files ingested in incremental with Auto Loader: vibration, energy produced etc. 1 point every X sec per sensor."
-AS SELECT * FROM cloud_files("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/incoming_data", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/navy_raw_landing/incoming_data", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
@@ -183,21 +183,21 @@ CREATE OR REFRESH STREAMING TABLE historical_turbine_status (
   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL)
 )
 COMMENT "Turbine status to be used as label in our predictive maintenance model (to know which turbine is potentially faulty)"
-AS SELECT * FROM cloud_files("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/historical_turbine_status", "json", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/navy_raw_landing/historical_turbine_status", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Ship metadata
 CREATE STREAMING TABLE ship_meta 
 COMMENT "Ship to turbine Meta_Data mapping"
-AS SELECT * FROM cloud_files("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/ship_meta", "json", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/navy_raw_landing/ship_meta", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Parts and stock information
 CREATE STREAMING TABLE parts 
 COMMENT "Turbine parts from our manufacturing system"
-AS SELECT * FROM cloud_files("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/parts", "json", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/navy_raw_landing/parts", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
@@ -289,7 +289,7 @@ SELECT * except(t._rescued_data, s._rescued_data, m.turbine_id) FROM LIVE.sensor
 -- COMMAND ----------
 
 CREATE LIVE TABLE turbine_current_status 
-COMMENT "Wind turbine last status based on model prediction"
+COMMENT "Navy gas turbine last status based on model prediction"
 AS
 WITH latest_metrics AS (
   SELECT *, ROW_NUMBER() OVER(PARTITION BY turbine_id, hourly_timestamp ORDER BY hourly_timestamp DESC) AS row_number FROM LIVE.sensor_hourly

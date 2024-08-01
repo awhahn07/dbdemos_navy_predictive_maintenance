@@ -19,12 +19,10 @@
 
 import mlflow
 mlflow.set_registry_uri('databricks-uc')
-catalog = spark.conf.get("catalog")
-db = spark.conf.get("db")
-#                                                                                                       Stage/version  
-#                                                                                    Model name             |        
-#                                                                                         |                 |        
-predict_maintenance_udf = mlflow.pyfunc.spark_udf(spark, f"models:/{catalog}.{db}.navy_turbine_maintenance@prod", "string") #, env_manager='virtualenv'
+#                                                                                                               Stage/version  
+#                                                                      Model name                                         |        
+#                                                                                         |                               |        
+predict_maintenance_udf = mlflow.pyfunc.spark_udf(spark, "models:/ahahn_demo.dbdemos_navy_pdm.navy_turbine_maintenance@prod", "string") #, env_manager='virtualenv'
 spark.udf.register("predict_maintenance", predict_maintenance_udf)
 
 # COMMAND ----------

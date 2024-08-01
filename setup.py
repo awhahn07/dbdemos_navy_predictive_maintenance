@@ -21,10 +21,6 @@ from databricks.sdk.service import jobs, pipelines, dashboards
 
 # COMMAND ----------
 
-# MAGIC %run ./_resources/00-notebook_utils
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC
 # MAGIC # CREATE RESOURCE FOR NAVY TURBINE DEMO
@@ -44,12 +40,6 @@ from databricks.sdk.service import jobs, pipelines, dashboards
 # MAGIC ## EXECUTE JOB RUN
 # MAGIC
 # MAGIC Run created job
-
-# COMMAND ----------
-
-# DBTITLE 1,Fix hard coded paths in data ingestion notebooks
-editor = NotebookEditor(catalog=catalog, db=db)
-editor.convert()
 
 # COMMAND ----------
 
@@ -85,6 +75,7 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,Create DLT Pipeline
+#TODO remove _test suffix from the dlt pipeline name
 dlt_name = 'dbdemos_dlt_navy_turbine_{}_{}'.format(name['first'], name['last'])
 dlt_notebook_paths = [
     f'{notebook_base}/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL',
@@ -125,6 +116,10 @@ try:
       target=db,
       development=True,
       catalog=catalog,
+      configuration={
+        "catalog": catalog,
+        "db": db
+      }
   )
   dlt_id = dlt_pipeline.pipeline_id
   print(f'Created Pipeline ID: {dlt_id}, Name: {dlt_name}')
@@ -307,3 +302,9 @@ run_by_id = w.jobs.run_now(job_id=created_job.job_id).result()
 
 # d = w.dashboards.get(dahsboard_uuid)
 # serialized = d.as_dict()
+
+# COMMAND ----------
+
+# MAGIC %environment
+# MAGIC "client": "1"
+# MAGIC "base_environment": ""

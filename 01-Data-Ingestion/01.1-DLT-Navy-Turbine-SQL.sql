@@ -127,13 +127,13 @@
 
 -- DBTITLE 1,Wind Turbine metadata:
 -- MAGIC %python
--- MAGIC spark.read.json("/Volumes/ahahn_demo/dbdemos_navy_pdm/navy_raw_landing/turbine").display()
+-- MAGIC spark.read.json("/Volumes/ahahn_demo/dbdemos_navy_pdm_test/navy_raw_landing/turbine").display()
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Wind Turbine sensor data
 -- MAGIC %python
--- MAGIC display(spark.read.parquet('/Volumes/main/dbdemos_iot_turbine/turbine_raw_landing/incoming_data'))
+-- MAGIC display(spark.read.parquet('/Volumes/ahahn_demo/dbdemos_navy_pdm_test/navy_raw_landing/incoming_data'))
 
 -- COMMAND ----------
 

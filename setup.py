@@ -21,6 +21,10 @@ from databricks.sdk.service import jobs, pipelines, dashboards
 
 # COMMAND ----------
 
+# MAGIC %run ./_resources/00-notebook_utils
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC
 # MAGIC # CREATE RESOURCE FOR NAVY TURBINE DEMO
@@ -43,11 +47,18 @@ from databricks.sdk.service import jobs, pipelines, dashboards
 
 # COMMAND ----------
 
+# DBTITLE 1,Fix hard coded paths in data ingestion notebooks
+editor = NotebookEditor(catalog=catalog, db=db)
+editor.convert()
+
+# COMMAND ----------
+
 # DBTITLE 1,Init
 from pathlib import Path
 
 # Field Eng Shared UC Cluster
-uc_table_creator = "0601-182128-dcbte59m"
+# TODO delete since running serverless now
+# uc_table_creator = "0601-182128-dcbte59m"
 
 #Instantiate workspace client
 w = WorkspaceClient()

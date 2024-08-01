@@ -74,9 +74,10 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,Create DLT Pipeline
-dlt_name = 'dbdemos_dlt_navy_turbine_{}_{}'.format(name['first'], name['last'])
+#TODO remove _test suffix from the dlt pipeline name
+dlt_name = 'dbdemos_dlt_navy_turbine_{}_{}_test'.format(name['first'], name['last'])
 dlt_notebook_paths = [
-    f'{notebook_base}/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL',
+    f'{notebook_base}/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL_CONFIG_TEST',
     f'{notebook_base}/01-Data-Ingestion/01.2-DLT-Navy-GasTurbine-SQL-UDF'
 ]
 
@@ -114,6 +115,10 @@ try:
       target=db,
       development=True,
       catalog=catalog,
+      configuration={
+        "catalog": catalog,
+        "db": db
+      }
   )
   dlt_id = dlt_pipeline.pipeline_id
   print(f'Created Pipeline ID: {dlt_id}, Name: {dlt_name}')
@@ -296,3 +301,9 @@ run_by_id = w.jobs.run_now(job_id=created_job.job_id).result()
 
 # d = w.dashboards.get(dahsboard_uuid)
 # serialized = d.as_dict()
+
+# COMMAND ----------
+
+# MAGIC %environment
+# MAGIC "client": "1"
+# MAGIC "base_environment": ""

@@ -13,6 +13,6 @@
 #Instead, please re-install the demo with a specific catalog and schema using dbdemos.install("lakehouse-retail-c360", catalog="..", schema="...")
 
 catalog = "ahahn_demo"
-schema = dbName = db = "dbdemos_navy_pdm_test"
+schema = dbName = db = "dbdemos_navy_pdm"
 
 volume_name = "navy_raw_landing"

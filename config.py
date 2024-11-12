@@ -10,16 +10,10 @@
 # COMMAND ----------
 
 catalog = "ahahn_demo"
-schema = dbName = db = "dbdemos_navy_pdm"
+schema = dbName = db = "dbdemos_navy_pdm_datset_test"
 volume_name = "navy_raw_landing"
 
 
 # catalog = dbutils.widgets.get("catalog")
 # schema = dbName = db = dbutils.widgets.get("db")
 # volume_name = dbutils.widgets.get("volume")
-
-# COMMAND ----------
-
-# MAGIC %environment
-# MAGIC "client": "1"
-# MAGIC "base_environment": ""

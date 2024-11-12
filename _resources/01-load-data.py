@@ -1,5 +1,7 @@
 # Databricks notebook source
 # MAGIC %pip install git+https://github.com/QuentinAmbard/mandrova faker databricks-sdk==0.17.0
+# MAGIC
+# MAGIC # Restart the Python environment
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -89,6 +91,7 @@ client = mlflow.tracking.MlflowClient()
 try:
   latest_model = client.get_model_version_by_alias(f"{catalog}.{db}.{model_name}", "prod")
 except Exception as e:
+    print(e)
     if "RESOURCE_DOES_NOT_EXIST" in str(e):
         print("Model doesn't exist - saving an empty one")
         # setup the experiment folder
@@ -107,7 +110,13 @@ except Exception as e:
         model_registered = mlflow.register_model(f'runs:/{run.info.run_id}/model', f"{catalog}.{db}.{model_name}")
         client.set_registered_model_alias(name=f"{catalog}.{db}.{model_name}", alias="prod", version=model_registered.version)
     else:
-        print(f"ERROR: couldn't access model for unknown reason - DLT pipeline will likely fail as model isn't available: {e}")
+        raise e
+        # print(f"ERROR: couldn't access model for unknown reason - DLT pipeline will likely fail as model isn't available: {e}")
+
+# COMMAND ----------
+
+latest_model = client.get_model_version_by_alias(f"{catalog}.{db}.{model_name}", "prod")
+
 
 # COMMAND ----------
 

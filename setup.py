@@ -114,12 +114,13 @@ try:
       libraries=library_list,
       clusters=clusters,
       target=db,
+      photon=False,
       development=True,
       catalog=catalog,
       configuration={
         "catalog": catalog,
         "db": db
-      }
+      },
   )
   dlt_id = dlt_pipeline.pipeline_id
   print(f'Created Pipeline ID: {dlt_id}, Name: {dlt_name}')
@@ -143,7 +144,7 @@ job_clusters = [
   jobs.JobCluster.from_dict({
     "job_cluster_key": "Shared_job_cluster",
     "new_cluster": {
-      "spark_version": "13.3.x-cpu-ml-scala2.12",
+      "spark_version": "15.1.x-cpu-ml-scala2.12",
       "spark_conf": {
         "spark.master": "local[*, 4]",
         "spark.databricks.cluster.profile": "singleNode",
@@ -152,7 +153,7 @@ job_clusters = [
       "custom_tags": {
         "ResourceClass": "SingleNode",
         "project": "dbdemos",
-        "demo": "lakehouse-iot-platform"
+        "demo": "lakehouse-navy-maintenance"
       },
       "spark_env_vars": {
         "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
@@ -163,26 +164,6 @@ job_clusters = [
       "num_workers": 0
     }
   }),
-# TODO Keep if shared existing clusters don't work
-# jobs.JobCluster.from_dict({  
-#   "job_cluster_key": "table_creator",
-#     "new_cluster": {
-#       "cluster_name": "",
-#       "spark_version": "14.3.x-scala2.12",
-#       "aws_attributes": {
-#         "first_on_demand": 1,
-#         "availability": "SPOT_WITH_FALLBACK",
-#         "zone_id": "us-west-2a",
-#         "spot_bid_price_percent": 100,
-#         "ebs_volume_count": 0
-#       },
-#       "node_type_id": "i3.xlarge",
-#       "enable_elastic_disk": false,
-#       "data_security_mode": "USER_ISOLATION",
-#       "runtime_engine": "STANDARD",
-#       "num_workers": 1
-#     },
-#   })
 ]
 
 tasks = [
@@ -195,6 +176,7 @@ tasks = [
         "source": "WORKSPACE"
       },
       "job_cluster_key": "Shared_job_cluster",
+      #"existing_cluster_id": "0329-145545-rugby794", 
       "timeout_seconds": 0,
       "email_notifications": {}
     }),
@@ -244,6 +226,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/04-Data-Science-ML/04.1-automl-iot-turbine-predictive-maintenance",
         "source": "WORKSPACE"
       },
+      #Possibly add Share Americas Autoscaling Cluster
       "job_cluster_key": "Shared_job_cluster",
       "timeout_seconds": 0,
       "email_notifications": {}
@@ -302,9 +285,3 @@ run_by_id = w.jobs.run_now(job_id=created_job.job_id).result()
 
 # d = w.dashboards.get(dahsboard_uuid)
 # serialized = d.as_dict()
-
-# COMMAND ----------
-
-# MAGIC %environment
-# MAGIC "client": "1"
-# MAGIC "base_environment": ""

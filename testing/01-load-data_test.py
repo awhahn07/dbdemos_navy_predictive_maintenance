@@ -8,10 +8,7 @@ dbutils.widgets.dropdown("reset_all_data", "false", ["true", "false"], "Reset al
 
 # COMMAND ----------
 
-# MAGIC %run ../config
-
-# COMMAND ----------
-
+catalog = "ahahn_demo"
 db = dbName = schema = 'test'
 volume_name = 'navy_test'
 

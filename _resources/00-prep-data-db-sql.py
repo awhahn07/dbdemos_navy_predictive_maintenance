@@ -34,29 +34,29 @@ spark.sql(
 
 # COMMAND ----------
 
-# MAGIC %sql 
-# MAGIC
-# MAGIC CREATE OR REPLACE TABLE sensor_maintenance (
-# MAGIC   fault VARCHAR(255),
-# MAGIC   maintenance VARCHAR(255),
-# MAGIC   operable BOOLEAN,
-# MAGIC   ttr FLOAT,
-# MAGIC   parts ARRAY<VARCHAR(255)>
-# MAGIC );
-# MAGIC
-# MAGIC INSERT INTO sensor_maintenance
-# MAGIC (fault, maintenance, operable, ttr, parts)
-# MAGIC VALUES
-# MAGIC ('sensor_B', 'Ships Force', TRUE, 10.5, ARRAY()),
-# MAGIC ('sensor_D', 'Ships Force', TRUE, 5, ARRAY()),
-# MAGIC ('sensor_F', 'Depot/I-Level', FALSE, 24, ARRAY());
+# %sql 
+
+# CREATE OR REPLACE TABLE sensor_maintenance (
+#   fault VARCHAR(255),
+#   maintenance VARCHAR(255),
+#   operable BOOLEAN,
+#   ttr FLOAT,
+#   parts ARRAY<VARCHAR(255)>
+# );
+
+# INSERT INTO sensor_maintenance
+# (fault, maintenance, operable, ttr, parts)
+# VALUES
+# ('sensor_B', 'Ships Force', TRUE, 10.5, ARRAY()),
+# ('sensor_D', 'Ships Force', TRUE, 5, ARRAY()),
+# ('sensor_F', 'Depot/I-Level', FALSE, 24, ARRAY());
 
 # COMMAND ----------
 
-# MAGIC %sql 
-# MAGIC
-# MAGIC CREATE OR REPLACE TABLE ship_current_status_gold AS
-# MAGIC SELECT t.turbine_id, t.hourly_timestamp, t.prediction, s.* except(s.turbine_id), m.* FROM turbine_current_status t
-# MAGIC JOIN ship_meta s USING (turbine_id)
-# MAGIC LEFT JOIN sensor_maintenance m ON prediction = m.fault
-# MAGIC WHERE hourly_timestamp = (SELECT max(hourly_timestamp) FROM turbine_current_status)
+# %sql 
+
+# CREATE OR REPLACE TABLE ship_current_status_gold AS
+# SELECT t.turbine_id, t.hourly_timestamp, t.prediction, s.* except(s.turbine_id), m.* FROM turbine_current_status t
+# JOIN ship_meta s USING (turbine_id)
+# LEFT JOIN sensor_maintenance m ON prediction = m.fault
+# WHERE hourly_timestamp = (SELECT max(hourly_timestamp) FROM turbine_current_status)

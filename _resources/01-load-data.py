@@ -120,7 +120,34 @@ latest_model = client.get_model_version_by_alias(f"{catalog}.{db}.{model_name}",
 
 # COMMAND ----------
 
+# DBTITLE 1,Create Sensor Maintenance Table
+from pyspark.sql.types import StructType, StructField, StringType, BooleanType, FloatType, ArrayType
+
+spark.sql(f"USE CATALOG {catalog}")
+spark.sql(f"USE SCHEMA {db}")
+
+sensor_schema = StructType([
+    StructField("fault", StringType(), True),
+    StructField("maintenance", StringType(), True),
+    StructField("operable", BooleanType(), True),
+    StructField("ttr", FloatType(), True),
+    StructField("parts", ArrayType(StringType()), True)
+])
+
+data = [
+    ('sensor_B', 'Ships Force', True, 10.5, []),
+    ('sensor_D', 'Ships Force', True, 5.0, []),
+    ('sensor_F', 'Depot/I-Level', False, 24.0, [])
+]
+
+df = spark.createDataFrame(data, sensor_schema)
+df.write.mode("overwrite").saveAsTable("sensor_maintenance")
+
+# COMMAND ----------
+
 if data_downloaded:
+    dbutils.notebook.exit(f"Data Downloaded to {folder}")
+elif data_exists==True and reset_all_data==False: 
     dbutils.notebook.exit(f"Data Downloaded to {folder}")
 
 # COMMAND ----------

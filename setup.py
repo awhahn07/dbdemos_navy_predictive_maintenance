@@ -67,7 +67,6 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,Create DLT Pipeline
-#TODO remove _test suffix from the dlt pipeline name
 dlt_name = 'dbdemos_dlt_navy_turbine_{}_{}'.format(name['first'], name['last'])
 dlt_notebook_paths = [
     f'{notebook_base}/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL',

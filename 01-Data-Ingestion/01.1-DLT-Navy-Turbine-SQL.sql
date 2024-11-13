@@ -302,6 +302,14 @@ SELECT * EXCEPT(m.row_number),
 
 -- COMMAND ----------
 
+CREATE LIVE TABLE ship_current_status_gold AS
+SELECT t.turbine_id, t.hourly_timestamp, t.prediction, s.* except(s.turbine_id), m.* FROM LIVE.turbine_current_status t
+JOIN LIVE.ship_meta s USING (turbine_id)
+LEFT JOIN ${catalog}.${db}.sensor_maintenance m ON prediction = m.fault
+WHERE hourly_timestamp = (SELECT max(hourly_timestamp) FROM LIVE.turbine_current_status)
+
+-- COMMAND ----------
+
 -- MAGIC %md
 -- MAGIC
 -- MAGIC ## Conclusion

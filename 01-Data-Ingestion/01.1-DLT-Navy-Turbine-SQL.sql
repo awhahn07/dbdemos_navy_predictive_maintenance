@@ -293,12 +293,12 @@ COMMENT "Navy gas turbine last status based on model prediction"
 AS
 WITH latest_metrics AS (
   SELECT *, ROW_NUMBER() OVER(PARTITION BY turbine_id, hourly_timestamp ORDER BY hourly_timestamp DESC) AS row_number FROM LIVE.sensor_hourly
+    INNER JOIN LIVE.turbine t USING (turbine_id)
 )
 SELECT * EXCEPT(m.row_number), 
-    predict_maintenance(turbine_id, hourly_timestamp, avg_energy, std_sensor_A, std_sensor_B, std_sensor_C, std_sensor_D, std_sensor_E, std_sensor_F, percentiles_sensor_A, percentiles_sensor_B, percentiles_sensor_C, percentiles_sensor_D, percentiles_sensor_E, percentiles_sensor_F) as prediction 
+    predict_maintenance(hourly_timestamp, avg_energy, std_sensor_A, std_sensor_B, std_sensor_C, std_sensor_D, std_sensor_E, std_sensor_F, percentiles_sensor_A, percentiles_sensor_B, percentiles_sensor_C, percentiles_sensor_D, percentiles_sensor_E, percentiles_sensor_F, m.location, m.model, m.state) as prediction 
   FROM latest_metrics m
-   INNER JOIN LIVE.turbine t USING (turbine_id)
-   WHERE m.row_number=1
+  WHERE m.row_number=1
 
 -- COMMAND ----------
 

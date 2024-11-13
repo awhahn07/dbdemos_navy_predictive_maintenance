@@ -46,10 +46,6 @@ from databricks.sdk.service import jobs, pipelines, dashboards
 # DBTITLE 1,Init
 from pathlib import Path
 
-# Field Eng Shared UC Cluster
-# TODO delete since running serverless now
-# uc_table_creator = "0601-182128-dcbte59m"
-
 #Instantiate workspace client
 w = WorkspaceClient()
 
@@ -59,7 +55,6 @@ user_name = w.current_user.me().user_name
 # Create base notebook path (path to project directory in workspace) 
 current_notebook = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
 notebook_base = str(Path(current_notebook).parent)
-# notebook_base = f'/Workspace/Users/{user_name}/lakehouse_navy_PdM_v2'
 
 # Get user First and Last Name
 name_regex = r'^(\w+)\.(\w+)@'
@@ -68,9 +63,6 @@ if match:
   name = {'first': match.group(1), 'last': match.group(2)}
 else:
   raise "Unable to extract user name"
-
-
-# w.clusters.ensure_cluster_is_running(ml_cluster_id)
 
 # COMMAND ----------
 

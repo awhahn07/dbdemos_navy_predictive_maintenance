@@ -43,6 +43,22 @@ def cleanup_folder(path):
 
 # COMMAND ----------
 
+# Add renove after tag to schema so talbes dont get deleted for 90 days
+from datetime import datetime, timedelta
+
+def get_date_plus_90_days():
+    current_date = datetime.now()
+    future_date = current_date + timedelta(days=90)
+    return future_date.strftime('%Y%m%d')
+  
+tag_key = 'RemoveAfter'
+tag_val = get_date_plus_90_days()
+
+sql = f"""ALTER SCHEMA {catalog}.{db} SET TAGS ('{tag_key}'='{tag_val}')"""
+spark.sql(sql)
+
+# COMMAND ----------
+
 data_downloaded = False
 # if not data_exists:
 #     try:

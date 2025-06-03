@@ -212,6 +212,13 @@ def transport_optimization(pdf: pd.DataFrame) -> pd.DataFrame:
 # COMMAND ----------
 
 # Test the function
+product_selection = "Pump - Fuel"
+pdf = lp_table.filter(f.col("type")==product_selection).toPandas()
+transport_optimization(pdf)
+
+# COMMAND ----------
+
+# Test the function
 product_selection = "Seal"
 pdf = lp_table.filter(f.col("type")==product_selection).toPandas()
 transport_optimization(pdf)

@@ -155,6 +155,28 @@ job_clusters = [
       "num_workers": 0
     }
   }),
+  jobs.JobCluster.from_dict({
+    "job_cluster_key": "DLT_fix_cluster",
+    "new_cluster": {
+      "data_security_mode": "DATA_SECURITY_MODE_DEDICATED",
+      "custom_tags": {
+        "project": "dbdemos",
+        "demo": "lakehouse-navy-maintenance"
+      },
+      "kind": "CLASSIC_PREVIEW",
+      "spark_conf": {
+        "spark.databricks.dataLineage.enabled": "true"
+      },
+      "spark_env_vars": {
+        "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+      },
+      "runtime_engine": "STANDARD",
+      "spark_version": "16.2.x-scala2.12",
+      "instance_pool_id": "0727-104344-hauls13-pool-uftxk0r6",
+      "use_ml_runtime": "true",
+      "is_single_node": "true"
+    }
+  })
 ]
 
 tasks = [
@@ -166,8 +188,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/_resources/01-load-data",
         "source": "WORKSPACE"
       },
-      "job_cluster_key": "Shared_job_cluster",
-      #"existing_cluster_id": "0329-145545-rugby794", 
+      "job_cluster_key": "DLT_fix_cluster",
       "timeout_seconds": 0,
       "email_notifications": {}
     }),
@@ -234,7 +255,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/04-Data-Science-ML/04.2-AutoML-best-register-model",
         "source": "WORKSPACE"
       },
-      "job_cluster_key": "Shared_job_cluster",
+      "job_cluster_key": "DLT_fix_cluster",
       "timeout_seconds": 0,
       "email_notifications": {}
     }),

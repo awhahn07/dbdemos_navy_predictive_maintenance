@@ -1,14 +1,8 @@
 # Databricks notebook source
 # DBTITLE 1,Let's install mlflow to load our model
-# %pip install mlflow importlib-metadata==6.8.0 cloudpickle==2.0.0 zipp==3.16.2
-# %pip install category-encoders==2.5.1.post0 cffi==1.15.0 cloudpickle==2.0.0 databricks-automl-runtime==0.2.15 defusedxml==0.7.1 holidays==0.18 lightgbm==3.3.4 matplotlib==3.5.1 psutil==5.8.0 scikit-learn==1.0.2 typing-extensions==4.1.1 
-# %pip install azure-core azure-storage-file-datalake #for the display() in Azure only
-# %pip install --ignore-installed Jinja2==3.1.2 markupsafe==2.1.1
-
-%pip install mlflow==2.14.3 importlib-metadata==6.8.0 cloudpickle==2.2.1 zipp==3.16.2
-%pip install category-encoders==2.5.1.post0 cffi==1.15.0 databricks-automl-runtime==0.2.15 defusedxml==0.7.1 holidays==0.18 lightgbm==4.2.0 psutil==5.8.0 scikit-learn==1.1.1 typing-extensions==4.1.1 
-%pip install azure-core azure-storage-file-datalake #for the display() in Azure only
-%pip install --ignore-installed Jinja2==3.1.2 markupsafe==2.1.1
+# MAGIC %pip install mlflow==2.22.0
+# MAGIC # %pip install azure-core azure-storage-file-datalake #for the display() in Azure only
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -29,7 +23,7 @@ db = spark.conf.get("db")
 #                                                                                                       Stage/version  
 #                                                                                    Model name             |        
 #                                                                                         |                 |        
-predict_maintenance_udf = mlflow.pyfunc.spark_udf(spark, f"models:/{catalog}.{db}.navy_turbine_maintenance@prod", "string") #, env_manager='virtualenv'
+predict_maintenance_udf = mlflow.pyfunc.spark_udf(spark, f"models:/{catalog}.{db}.navy_turbine_maintenance@prod", "string",env_manager='virtualenv')
 spark.udf.register("predict_maintenance", predict_maintenance_udf)
 
 # COMMAND ----------

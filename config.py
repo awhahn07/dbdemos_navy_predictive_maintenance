@@ -10,7 +10,7 @@
 # COMMAND ----------
 
 catalog = "ahahn_demo"
-schema = dbName = db = "dbdemos_navy_pdm"
+schema = dbName = db = "dbdemos_navy_pdm_test"
 volume_name = "navy_raw_landing"
 
 

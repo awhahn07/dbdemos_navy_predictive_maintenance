@@ -21,13 +21,11 @@ import os
 class DBDemos():
   @staticmethod
   def setup_schema(catalog, db, reset_all_data, volume_name = None):
+
     if reset_all_data:
       print(f'clearing up volume named `{catalog}`.`{db}`.`{volume_name}`')
-      try:
-        spark.sql(f"DROP VOLUME IF EXISTS `{catalog}`.`{db}`.`{volume_name}`")
-        spark.sql(f"DROP SCHEMA IF EXISTS `{catalog}`.`{db}` CASCADE")
-      except Exception as e:
-        print(f'catalog `{catalog}` or schema `{db}` do not exist.  Skipping data reset')
+      spark.sql(f"DROP VOLUME IF EXISTS `{catalog}`.`{db}`.`{volume_name}`")
+      spark.sql(f"DROP SCHEMA IF EXISTS `{catalog}`.`{db}` CASCADE")
 
     def use_and_create_db(catalog, dbName, cloud_storage_path = None):
       print(f"USE CATALOG `{catalog}`")
@@ -77,29 +75,7 @@ class DBDemos():
   @staticmethod
   def is_any_folder_empty(folders):
     return any([DBDemos.is_folder_empty(f) for f in folders])
-
-  @staticmethod
-  def set_model_permission(model_name, permission, principal):
-    import databricks.sdk.service.catalog as c
-    sdk_client = databricks.sdk.WorkspaceClient()
-    return sdk_client.grants.update(c.SecurableType.FUNCTION, model_name, changes=[
-                              c.PermissionsChange(add=[c.Privilege[permission]], principal=principal)])
-
-  @staticmethod
-  def set_model_endpoint_permission(endpoint_name, permission, group_name):
-    import databricks.sdk.service.serving as s
-    sdk_client = databricks.sdk.WorkspaceClient()
-    ep = sdk_client.serving_endpoints.get(endpoint_name)
-    return sdk_client.serving_endpoints.set_permissions(serving_endpoint_id=ep.id, access_control_list=[s.ServingEndpointAccessControlRequest(permission_level=s.ServingEndpointPermissionLevel[permission], group_name=group_name)])
-
-  @staticmethod
-  def set_index_permission(index_name, permission, principal):
-      import databricks.sdk.service.catalog as c
-      sdk_client = databricks.sdk.WorkspaceClient()
-      return sdk_client.grants.update(c.SecurableType.TABLE, index_name, changes=[
-                              c.PermissionsChange(add=[c.Privilege[permission]], principal=principal)])
     
-
   @staticmethod
   def download_file_from_git(dest, owner, repo, path):
     def download_file(url, destination):
@@ -124,7 +100,7 @@ class DBDemos():
     def download_to_dest(url):
       try:
         #Temporary fix to avoid hitting github limits - Swap github to our S3 bucket to download files
-        s3url = url.replace("https://raw.githubusercontent.com/databricks-demos/dbdemos-dataset/main/", "https://dbdemos-dataset.s3.amazonaws.com/")
+        s3url = url.replace("https://raw.githubusercontent.com/databricks-demos/dbdemos-dataset/main/", "https://notebooks.databricks.com/demos/dbdemos-dataset/")
         download_file(s3url, dest)
       except:
         download_file(url, dest)
@@ -234,125 +210,10 @@ class DBDemos():
         # Calculate the difference in days from the current date
         days_difference = (datetime.now() - date).days
         if days_difference > 30:
-            raise Exception(f"It looks like the last experiment {last_xp} is too old ({days_difference} days). Please re-run the previous notebook to make sure you have the latest version. Delete the experiment folder if needed to clear history.")
+            raise Exception(f"It looks like the last experiment {last_xp} is too old ({days} days). Please re-run the previous notebook to make sure you have the latest version.")
     else:
         raise Exception(f"Invalid experiment format or no experiment available. Please re-run the previous notebook. {last_xp['path']}")
     return last_xp
-  
-
-  @staticmethod
-  def wait_for_table(table_name, timeout_duration=120):
-    import time
-    i = 0
-    while not spark.catalog.tableExists(table_name) or spark.table(table_name).count() == 0:
-      time.sleep(1)
-      if i > timeout_duration:
-        raise Exception(f"couldn't find table {table_name} or table is empty. Do you have data being generated to be consumed?")
-      i += 1
-
-  @staticmethod
-  def get_python_version_mlflow():
-    import sys
-    # Determine target version
-    major, minor, micro = sys.version_info[:3]
-
-    if major == 3 and minor == 11 and micro > 10:
-        return "3.11.10"
-    elif major == 3 and minor == 12 and micro > 3:
-        return "3.12.3"
-    else:
-        return f"{major}.{minor}.{micro}"
-
-  # Workaround for dbdemos to support automl the time being, creates a mock run simulating automl results
-  @staticmethod
-  def create_mockup_automl_run(full_xp_path, df, model_name=None, target_col=None):
-    import mlflow
-    import os
-    print("AutoML doesn't seem to be available, creating a mockup automl run instead - automl serverless will be added soon...")
-    from databricks.sdk import WorkspaceClient
-    # Initialize the WorkspaceClient
-    w = WorkspaceClient()
-    w.workspace.mkdirs(path=os.path.dirname(full_xp_path))
-    xp = mlflow.create_experiment(full_xp_path)
-    mlflow.set_experiment(experiment_id=xp)
-    with mlflow.start_run(run_name="DBDemos automl mock autoML run", experiment_id=xp) as run:
-        mlflow.set_tag('mlflow.source.name', 'Notebook: DataExploration')
-        mlflow.log_metric('val_f1_score', 0.81)
-        
-        split_choices = ['train', 'val', 'test']
-        split_probabilities = [0.7, 0.2, 0.1]  # 70% train, 20% val, 10% test
-        # Add a new column with random assignments
-        import numpy as np
-        df['_automl_split_col'] = np.random.choice(split_choices, size=len(df), p=split_probabilities)
-        import uuid
-        import os
-        random_path = f"/tmp/{uuid.uuid4().hex}/dataset.parquet"
-        os.makedirs(os.path.dirname(random_path), exist_ok=True)
-        df.to_parquet(random_path, index=False)
-        mlflow.log_artifact(random_path, artifact_path='data/training_data')
-        model = None
-        if model_name is not None and target_col is not None:
-          from sklearn.ensemble import RandomForestClassifier
-          from sklearn.metrics import f1_score
-          import pandas as pd
-
-          class SafeRandomForestClassifier(RandomForestClassifier):
-              def fit(self, X, y=None, sample_weight=None):
-                  # Auto-drop datetime columns
-                  if isinstance(X, pd.DataFrame):
-                      datetime_cols = X.select_dtypes(include=['datetime']).columns
-                      if len(datetime_cols) > 0:
-                          X = X.drop(columns=datetime_cols)
-                  return super().fit(X, y, sample_weight)
-
-              def predict(self, X):
-                  # Same: drop datetime columns at predict time
-                  if isinstance(X, pd.DataFrame):
-                      datetime_cols = X.select_dtypes(include=['datetime']).columns
-                      if len(datetime_cols) > 0:
-                          X = X.drop(columns=datetime_cols)
-                  return super().predict(X)
-                
-          # Split the data based on _automl_split_col
-          train_df = df[df['_automl_split_col'] == 'train']
-          val_df = df[df['_automl_split_col'] == 'val']
-          
-          # Prepare training and validation datasets
-          X_train = train_df.drop(columns=['_automl_split_col', target_col], errors='ignore')
-          y_train = train_df[target_col]
-          X_val = val_df.drop(columns=['_automl_split_col', target_col], errors='ignore')
-          y_val = val_df[target_col]
-          
-          # Train RandomForest model
-          model = SafeRandomForestClassifier(random_state=42)
-          model.fit(X_train, y_train)
-          y_pred = model.predict(X_val)
-          val_f1 = f1_score(y_val, y_pred, average='weighted')
-          
-          # Log model and metric to MLflow
-          mlflow.log_metric('val_f1_score', val_f1)
-          mlflow.sklearn.log_model(model, artifact_path="model", input_example=X_train.iloc[[0]])
-
-        class BestTrialMock:
-            def __init__(self, mlflow_run_id, model):
-                self.mlflow_run_id = mlflow_run_id
-                self.model = model
-                run_data = mlflow.get_run(mlflow_run_id).data
-                self.metrics = run_data.metrics
-                self.params = run_data.params
-            def load_model(self):
-                return self.model
-        
-        class XPMock:
-            def __init__(self, experiment_id):
-                self.experiment_id = experiment_id
-        
-        class AutoMLRun:
-            def __init__(self, best_trial_mlflow_run_id, model, xp):
-                self.best_trial = BestTrialMock(best_trial_mlflow_run_id, model)
-                self.experiment = XPMock(xp)
-        
-        return AutoMLRun(run.info.run_id, model, xp)
 
 # COMMAND ----------
 

@@ -10,8 +10,8 @@
 # COMMAND ----------
 
 catalog = "ahahn_demo"
-schema = dbName = db = "dbdemos_navy_pdm"
-volume_name = "navy_raw_landing"
+schema = dbName = db = "dbdemos_pubsec_pdm"
+volume_name = "raw_landing"
 
 
 # catalog = dbutils.widgets.get("catalog")

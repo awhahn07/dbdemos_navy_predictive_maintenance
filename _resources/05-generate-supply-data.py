@@ -107,6 +107,29 @@ for row_ind, row in enumerate(adjacency_matrix):
 
 print(ranked) 
 
+import pandas as pd
+
+shipping_cost = {
+    'stock_location': [],
+    'homeport': [],
+    'distance': []
+}
+
+# Populate the dictionary with data
+
+for i in range(n):
+    for j in range(m):
+        shipping_cost['stock_location'].append(flc_locations[i])
+        shipping_cost['homeport'].append(hp_locations[j])
+        shipping_cost['distance'].append(ranked[i][j])
+# Create a Spark DataFrame from the Pandas DataFrame
+ranked_df = pd.DataFrame.from_dict(shipping_cost)
+
+# # Convert the Pandas DataFrame to a Spark DataFrame
+ranked_spark_df = spark.createDataFrame(ranked_df)
+
+# Write the Spark DataFrame to a Delta table
+ranked_spark_df.write.format("delta").mode("overwrite").saveAsTable("shipping_cost")
 
 
 # COMMAND ----------

@@ -22,7 +22,7 @@ catalog = spark.conf.get("catalog")
 db = spark.conf.get("db")
 #                                                                                                       Stage/version  
 #                                                                                    Model name             |        
-#                                                                                         |                 |        
+#
 predict_maintenance_udf = mlflow.pyfunc.spark_udf(spark, f"models:/{catalog}.{db}.navy_turbine_maintenance@prod", "string",env_manager='virtualenv')
 spark.udf.register("predict_maintenance", predict_maintenance_udf)
 

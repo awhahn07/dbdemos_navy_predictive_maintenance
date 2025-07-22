@@ -148,16 +148,15 @@ spark.sql(f"USE SCHEMA {db}")
 # TODO remove parts field (after eval)
 sensor_schema = StructType([
     StructField("fault", StringType(), True),
-    StructField("maintenance", StringType(), True),
+    StructField("maintenance_type", StringType(), True),
     StructField("operable", BooleanType(), True),
     StructField("ttr", FloatType(), True),
-    StructField("parts", ArrayType(StringType()), True)
 ])
 
 data = [
-    ('sensor_B', 'Ships Force', True, 10.5, []),
-    ('sensor_D', 'Ships Force', True, 5.0, []),
-    ('sensor_F', 'Depot/I-Level', False, 24.0, [])
+    ('sensor_B', 'Ships Force', True, 10.5),
+    ('sensor_D', 'Ships Force', True, 5.0),
+    ('sensor_F', 'Depot/I-Level', False, 24.0)
 ]
 
 df = spark.createDataFrame(data, sensor_schema)
@@ -492,10 +491,14 @@ for p in part_categories:
 pubsec_stock_joined = pd.DataFrame(parts).merge(stock_data, on='stock_location', suffixes=('', '_pubsec'))
 
 # Create spark df, write to volume 
-df = spark.createDataFrame(parts)
+df = spark.createDataFrame(pubsec_stock_joined)
 folder_parts = folder+'/parts_navy'
 df.write.mode('overwrite').format('json').save(folder_parts)
 cleanup(folder_parts)
+
+# COMMAND ----------
+
+display(pubsec_stock_joined)
 
 # COMMAND ----------
 
@@ -546,7 +549,7 @@ for p in part_categories:
 pubsec_stock_joined = pd.DataFrame(parts).merge(stock_data, on='stock_location', suffixes=('', '_pubsec'))
 
 # Create spark df, write to volume 
-df = spark.createDataFrame(parts)
+df = spark.createDataFrame(pubsec_stock_joined)
 folder_parts = folder+'/parts_pub'
 df.write.mode('overwrite').format('json').save(folder_parts)
 cleanup(folder_parts)
@@ -560,7 +563,7 @@ cleanup(folder_parts)
 # COMMAND ----------
 
 from pyspark.sql.functions import lit
-from pyspark.sql.functions import monotonically_increasing_id, floor, lit
+from pyspark.sql.functions import monotonically_increasing_id, floor, lit, hash, abs
 import pandas as pd
 
 file_location = "./platform_csvs/PdM_Platform_Data - navy_platform_data.csv"
@@ -585,7 +588,7 @@ status = (spark.read.format('json').load(folder_status)
           )
 
 # Assign turbine ID to ship metadata
-ship_meta = ships.join(status, 'join_key').drop('join_key')
+ship_meta = ships.join(status, 'join_key').drop('join_key').withColumn('designator_id', abs(hash('designator')))
 
 folder_ship = folder+'/ship_meta'
 ship_meta.write.mode('overwrite').format('json').save(folder_ship)
@@ -619,7 +622,7 @@ status = (spark.read.format('json').load(folder_status)
           .withColumn('join_key', monotonically_increasing_id() % num_ships)
           )
 # # Assign turbine ID to ship metadata
-ship_meta = ships.join(status, 'join_key')
+ship_meta = ships.join(status, 'join_key').drop('join_key').withColumn('designator_id', abs(hash('designator')))
 
 folder_platform = folder+'/platform_meta'
 ship_meta.write.mode('overwrite').format('json').save(folder_platform)

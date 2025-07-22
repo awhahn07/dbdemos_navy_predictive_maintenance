@@ -101,8 +101,8 @@ display(lp_table)
 res_schema = StructType(
   [
     StructField('type', StringType()),
-    StructField('stock_location_id', StringType()),
-    StructField('designator_id', StringType()),
+    StructField('stock_location', StringType()),
+    StructField('ship', StringType()),
     StructField('qty_shipped', IntegerType())
   ]
 )
@@ -112,10 +112,10 @@ res_schema = StructType(
 # Define a function that solves the LP for one product
 
 def transport_optimization(pdf: pd.DataFrame) -> pd.DataFrame:
-    pdf['stock_location_id'] = pdf['stock_location_id'].str.replace(' ', '_')
+    pdf['stock_location'] = pdf['stock_location'].str.replace(' ', '_')
 
     #Plants list, this defines the order of other data structures related to plants
-    plants_lst = sorted(pdf["stock_location_id"].unique().tolist())
+    plants_lst = sorted(pdf["stock_location"].unique().tolist())
     # plants_lst = [s.replace(' ', '_') for s in plants_lst] 
 
     # Distribution center list, this defines the order of other data structures related to distribution centers
@@ -134,21 +134,19 @@ def transport_optimization(pdf: pd.DataFrame) -> pd.DataFrame:
     ss_prod = pdf[ "type" ][0]
 
     # Costs, order of distribution centers and plants matter
-    transport_cost_table_pdf = pdf.filter(regex="^Cost_.+|^stock_location_id$")
+    transport_cost_table_pdf = pdf.filter(regex="^Cost_.+|^stock_location$")
     transport_cost_table_pdf = (transport_cost_table_pdf.
-                                rename(columns=lambda x: re.sub("^Cost_","",x)).
-                                set_index("stock_location_id").
+                                rename(columns=lambda x: re.sub("^Cost_USS","USS",x)).
+                                set_index("stock_location").
                                 reindex(plants_lst, axis=0).
                                 reindex(distribution_centers_lst, axis=1)
                                 )
-
-
     costs = pulp.makeDict([plants_lst, distribution_centers_lst], transport_cost_table_pdf.values.tolist(), 0)
 
     # Supply, order of plants matters
     plant_supply_pdf = (pdf.filter(regex="^Supply.+$").
                         drop_duplicates().
-                        rename(columns=lambda x: re.sub("^Supply_","",x)).
+                        rename(columns=lambda x: re.sub("^Supply_FLC","FLC",x)).
                         reindex(plants_lst, axis=1))
 
 
@@ -158,9 +156,9 @@ def transport_optimization(pdf: pd.DataFrame) -> pd.DataFrame:
 
 
     distribution_center_demand_pdf =  (pdf.
-                        filter(regex="^Demand_.+$").
+                        filter(regex="^Demand_USS.+$").
                         drop_duplicates().
-                        rename(columns=lambda x: re.sub("^Demand_","",x))
+                        rename(columns=lambda x: re.sub("^Demand_USS","USS",x))
                         )
     new_list = [name for name in distribution_center_demand_pdf.columns if name in distribution_centers_lst]
     distribution_center_demand_pdf = distribution_center_demand_pdf.reindex(new_list, axis=1)
@@ -202,14 +200,13 @@ def transport_optimization(pdf: pd.DataFrame) -> pd.DataFrame:
             value_lst.append(v.varValue)
             res = pd.DataFrame(data={'name': name_lst, 'qty_shipped': value_lst})
             res[ "qty_shipped" ] = res[ "qty_shipped" ].astype("int")
-            res[ "stock_location_id" ] =  res[ "name" ].str.extract(r'(supply_.*?)(?=_)')
-            # res[ "designator" ] =  res[ "name" ].str.extract(r'(USS_.+)')
-            res[ "designator_id" ] =  res[ "name" ].str.extract(r'([^_]+)$')
+            res[ "stock_location" ] =  res[ "name" ].str.extract(r'(FLC_.*?)(?=_USS)')
+            res[ "ship" ] =  res[ "name" ].str.extract(r'(USS_.+)')
             res[ "type" ] = ss_prod
             res = res.drop("name", axis = 1)
-            res = res[[ "type", "stock_location_id", "designator_id", "qty_shipped"]]
+            res = res[[ "type", "stock_location", "ship", "qty_shipped"]]
     else:
-        res = pd.DataFrame(data= {  "type" : [ ss_prod ] , "stock_location_id" : [ None ], "designator_id" : [ None ], "qty_shipped" : [ None ]})
+        res = pd.DataFrame(data= {  "type" : [ ss_prod ] , "stock_location" : [ None ], "ship" : [ None ], "qty_shipped" : [ None ]})
     return res
 
 # COMMAND ----------
@@ -231,7 +228,6 @@ optimal_transport_df = (
   .applyInPandas(transport_optimization, schema=res_schema)
 )
 
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -239,24 +235,16 @@ optimal_transport_df = (
 
 # COMMAND ----------
 
-display(optimal_transport_df.filter(optimal_transport_df['qty_shipped'] > 0))
+optimal_transport_df.createOrReplaceTempView('temp')
+spark.sql(
+  f"""
+  CREATE OR REPLACE TABLE {catalog}.{db}.shipment_recommendations_navy AS SELECT * FROM temp
+  """
+  )
 
 # COMMAND ----------
 
-parts = spark.read.table(f"{catalog}.{db}.parts").select('stock_location', 'stock_location_id').distinct()
-designators = spark.read.table(f"{catalog}.{db}.ship_meta").select('designator').distinct().withColumn('designator_id', f.abs(f.hash('designator')))
-
-# rejoin actual designator and stock location values to the unique IDs
-optimal_transport_df = optimal_transport_df.join(parts, on='stock_location_id').join(designators, on='designator_id')
-
-
-# COMMAND ----------
-
-display(optimal_transport_df.filter(optimal_transport_df['qty_shipped'] > 0))
-
-# COMMAND ----------
-
-optimal_transport_df.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.shipment_recommendations")
+display(spark.sql(f"SELECT * FROM {catalog}.{db}.shipment_recommendations_navy WHERE qty_shipped > 0"))
 
 # COMMAND ----------
 

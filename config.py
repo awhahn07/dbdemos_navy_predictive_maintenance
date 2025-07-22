@@ -9,10 +9,19 @@
 
 # COMMAND ----------
 
+dbutils.widgets.dropdown("sector", "pubsec", ["pubsec", "DoD"], "Select Sector")
+
+# COMMAND ----------
+
 catalog = "ahahn_demo"
 schema = dbName = db = "dbdemos_pubsec_pdm"
 volume_name = "raw_landing"
+demo_type = dbutils.widgets.get("sector")
 
+if demo_type == "pubsec":
+  schema = dbName = db = "dbdemos_pubsec_pdm"
+elif demo_type == "DoD":
+  schema = dbName = db = "dbdemos_dod_pdm"
 
 # catalog = dbutils.widgets.get("catalog")
 # schema = dbName = db = dbutils.widgets.get("db")

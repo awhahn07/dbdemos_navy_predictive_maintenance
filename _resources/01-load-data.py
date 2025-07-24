@@ -24,22 +24,17 @@ folder = f"/Volumes/{catalog}/{db}/{volume_name}"
 
 data_exists = False
 try:
+  #TODO update for new data versions
   dbutils.fs.ls(folder)
   dbutils.fs.ls(folder+"/historical_turbine_status")
-  dbutils.fs.ls(folder+"/parts")
+  dbutils.fs.ls(folder+f"/parts_{demo_type}")
   dbutils.fs.ls(folder+"/turbine")
   dbutils.fs.ls(folder+"/incoming_data")
-  dbutils.fs.ls(folder+"/ship_meta")
+  dbutils.fs.ls(folder+f"/meta_{demo_type}")
   data_exists = True
   print("data already exists")
 except Exception as e:
   print(f"folder doesn't exists, generating the data...")
-
-def cleanup_folder(path):
-  #Cleanup to have something nicer
-  for f in dbutils.fs.ls(path):
-    if f.name.startswith('_committed') or f.name.startswith('_started') or f.name.startswith('_SUCCESS') :
-      dbutils.fs.rm(f.path)
 
 # COMMAND ----------
 
@@ -59,26 +54,35 @@ spark.sql(sql)
 
 # COMMAND ----------
 
+git_profile = "awhahn07"
+git_repo = "dbdemos-fed-datasets"
+git_root_folder = "pdm_data"
+
+data_folders = [
+  "historical_turbine_status",
+  "turbine",
+  "incoming_data",
+  f"meta_{demo_type}",
+  f"parts_{demo_type}"
+]
+
+def download_data(volume_folder, git_profile, git_repo, git_root_folder, data_folders):
+  for folder in data_folders:
+    DBDemos.download_file_from_git(volume_folder+'/'+folder, git_profile, git_repo, '/'+git_root_folder+'/'+folder)
+
 data_downloaded = False
-# if not data_exists:
-#     try:
-#         DBDemos.download_file_from_git(folder+'/historical_turbine_status', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/historical_turbine_status")
-#         DBDemos.download_file_from_git(folder+'/parts', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/parts")
-#         DBDemos.download_file_from_git(folder+'/turbine', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/turbine")
-#         DBDemos.download_file_from_git(folder+'/incoming_data', "databricks-demos", "dbdemos-dataset", "/manufacturing/lakehouse-iot-turbine/incoming_data")
-#         data_downloaded = True
-#     except Exception as e: 
-#         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")  
 
 if not data_exists:
   if not reset_all_data:
     try:
-        DBDemos.download_file_from_git(folder+'/historical_turbine_status', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/historical_turbine_status")
-        DBDemos.download_file_from_git(folder+'/parts', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/parts")
-        DBDemos.download_file_from_git(folder+'/turbine', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/turbine")
-        DBDemos.download_file_from_git(folder+'/incoming_data', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/incoming_data")
-        DBDemos.download_file_from_git(folder+'/ship_meta', "awhahn07", "dbdemos-fed-datasets", "/navy_pdm_data/ship_meta")
-        data_downloaded = True
+      # TODO Update git data sources
+      download_data(folder, git_profile, git_repo, git_root_folder, data_folders)
+        # DBDemos.download_file_from_git(folder+'/historical_turbine_status', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/historical_turbine_status")
+        # DBDemos.download_file_from_git(folder+'/turbine', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/turbine")
+        # DBDemos.download_file_from_git(folder+'/incoming_data', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/incoming_data")
+        # DBDemos.download_file_from_git(folder+f'/meta_{demo_type}', "awhahn07", "dbdemos-fed-datasets", f"/new_pdm_data/meta_{demo_type}")
+        # DBDemos.download_file_from_git(folder+f'/parts_{demo_type}', "awhahn07", "dbdemos-fed-datasets", f"/new_pdm_data/parts_{demo_type})")    
+      data_downloaded = True
     except Exception as e: 
         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")     
 
@@ -104,7 +108,6 @@ class MaintenanceEmptyModel(mlflow.pyfunc.PythonModel):
  
 #Enable Unity Catalog with mlflow registry
 mlflow.set_registry_uri('databricks-uc')
-model_name = "navy_turbine_maintenance" 
 
 #Only register empty model if model doesn't exist yet
 client = mlflow.tracking.MlflowClient()
@@ -115,7 +118,7 @@ except Exception as e:
     if "RESOURCE_DOES_NOT_EXIST" in str(e):
         print("Model doesn't exist - saving an empty one")
         # setup the experiment folder
-        DBDemos.init_experiment_for_batch("navy_turbine_maintenance", "predictive_maintenance_mock")
+        DBDemos.init_experiment_for_batch(model_name, "predictive_maintenance_mock")
         # save the model
         churn_model = MaintenanceEmptyModel()
         import pandas as pd
@@ -128,13 +131,11 @@ except Exception as e:
         #Register & move the model in production
         model_registered = mlflow.register_model(f'runs:/{run.info.run_id}/model', f"{catalog}.{db}.{model_name}")
         client.set_registered_model_alias(name=f"{catalog}.{db}.{model_name}", alias="prod", version=model_registered.version)
+        latest_model = client.get_model_version_by_alias(f"{catalog}.{db}.{model_name}", "prod")
     else:
         raise e
         # print(f"ERROR: couldn't access model for unknown reason - DLT pipeline will likely fail as model isn't available: {e}")
 
-# COMMAND ----------
-
-latest_model = client.get_model_version_by_alias(f"{catalog}.{db}.{model_name}", "prod")
 
 
 # COMMAND ----------

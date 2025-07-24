@@ -30,8 +30,8 @@
           "expression": "CASE\nWHEN status == 'red' THEN 1 ELSE 0\nEND"
         }
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "4bf52947",
@@ -43,8 +43,8 @@
         "WHERE prediction != 'ok' AND type IS NOT NULL\n",
         "GROUP BY ALL"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "0aff856e",
@@ -52,8 +52,8 @@
       "queryLines": [
         "select * from ship_current_status_gold where prediction != 'ok'"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "66f9103e",
@@ -83,8 +83,8 @@
         "LEFT JOIN p ON s.prediction = p.sensor AND p.nearest_homeport = s.home_location\n",
         "WHERE (s.num_faults - p.stock) > 0 AND (s.num_faults - p.stock) IS NOT NULL;"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "1124505b",
@@ -96,8 +96,8 @@
         "CAST(long AS DOUBLE) AS long \n",
         "FROM ship_current_status_gold"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "f0a18247",
@@ -123,8 +123,8 @@
         "  sm.designator LIKE CONCAT('%', srn.designator, '%')\n",
         "WHERE srn.qty_shipped > 0"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "f261bf85",
@@ -156,8 +156,8 @@
         "  prediction \n",
         "FROM turbine_current_status;"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "8f4e7b0e",
@@ -168,8 +168,8 @@
         "  * \n",
         "FROM sensor_bronze;"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     },
     {
       "name": "8a940a4b",
@@ -184,8 +184,8 @@
         "JOIN homes ON shipment_recommendations.designator = homes.designator\n",
         "WHERE qty_shipped > 0"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_pubsec"
     }
   ],
   "pages": [

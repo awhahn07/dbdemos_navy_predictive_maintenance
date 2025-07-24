@@ -233,7 +233,7 @@ display(features)
 # DBTITLE 1,We have already started a run for you, you can explore it here:
 from databricks import automl
 
-xp_path = "/Shared/dbdemos/experiments/navy-turbine-maintenance"
+xp_path = f"/Shared/dbdemos/experiments/{experiment_name}"
 xp_name = f"automl_iot_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
 automl_run = automl.classify(
     experiment_name = xp_name,

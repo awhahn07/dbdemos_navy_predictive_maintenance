@@ -190,14 +190,14 @@ AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/historical_t
 -- DBTITLE 1,Ship metadata
 CREATE STREAMING TABLE ship_meta 
 COMMENT "Ship to turbine Meta_Data mapping"
-AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/platform_meta", "json", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/meta_${demo}", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Parts and stock information
 CREATE STREAMING TABLE parts 
 COMMENT "Turbine parts from our manufacturing system"
-AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/parts_pub", "json", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/parts_${demo}", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 

@@ -30,15 +30,15 @@ if "evaluate" not in dir(mlflow):
     raise Exception("ERROR - YOU NEED MLFLOW 2.0 for this demo. Select DBRML 12+")
     
 
-folder = f"/Volumes/{catalog}/{db}/{volume_name}"
+# folder = f"/Volumes/{catalog}/{db}/{volume_name}"
 
-if reset_all_data or DBDemos.is_any_folder_empty([folder+"/historical_turbine_status", folder+"/parts", folder+"/turbine", folder+"/incoming_data", folder+"/ship_meta"]):
-  #data generation on another notebook to avoid installing libraries (takes a few seconds to setup pip env)
-  print(f"Generating data under {folder} , please wait a few sec...")
-  path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
-  parent_count = path[path.rfind("lakehouse_navy_PdM_v2"):].count('/') - 1
-  prefix = "./" if parent_count == 0 else parent_count*"../"
-  prefix = f'{prefix}_resources/'
-  dbutils.notebook.run(prefix+"01-load-data", 600, {"reset_all_data": dbutils.widgets.get("reset_all_data"), "catalog": catalog, "db": db})
-else:
-  print("data already existing. Run with reset_all_data=true to force a data cleanup for your local demo.")
+# if reset_all_data or DBDemos.is_any_folder_empty([folder+"/historical_turbine_status", folder+"/parts", folder+"/turbine", folder+"/incoming_data", folder+"/ship_meta"]):
+#   #data generation on another notebook to avoid installing libraries (takes a few seconds to setup pip env)
+#   print(f"Generating data under {folder} , please wait a few sec...")
+#   path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+#   parent_count = path[path.rfind("lakehouse_navy_PdM_v2"):].count('/') - 1
+#   prefix = "./" if parent_count == 0 else parent_count*"../"
+#   prefix = f'{prefix}_resources/'
+#   dbutils.notebook.run(prefix+"01-load-data", 600, {"reset_all_data": dbutils.widgets.get("reset_all_data"), "catalog": catalog, "db": db})
+# else:
+#   print("data already existing. Run with reset_all_data=true to force a data cleanup for your local demo.")

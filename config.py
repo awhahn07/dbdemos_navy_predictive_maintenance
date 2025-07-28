@@ -30,7 +30,7 @@ volume_name = "raw_landing"
 # COMMAND ----------
 
 
-demo_type = "pubsec"
+demo_type = "navy"
 
 if demo_type == "pubsec":
   schema = dbName = db = "predictive_maintenance_pubsec"

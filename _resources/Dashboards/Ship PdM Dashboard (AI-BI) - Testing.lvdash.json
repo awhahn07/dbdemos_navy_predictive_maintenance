@@ -28,7 +28,7 @@
         "  state, \n",
         "  _rescued_data, \n",
         "  prediction \n",
-        "FROM ahahn_demo.dbdemos_navy_pdm.turbine_current_status;"
+        "FROM turbine_current_status;"
       ],
       "catalog": "public_sector",
       "schema": "predictive_maintenance_navy"
@@ -40,7 +40,7 @@
         "SELECT \n",
         "  from_unixtime(timestamp) as timestamp_datetime, \n",
         "  * \n",
-        "FROM ahahn_demo.dbdemos_navy_pdm.sensor_bronze;"
+        "FROM sensor_bronze;"
       ],
       "catalog": "public_sector",
       "schema": "predictive_maintenance_navy"

@@ -67,7 +67,7 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,Create DLT Pipeline
-dlt_name = 'dbdemos_dlt_navy_turbine_{}_{}'.format(name['first'], name['last'])
+dlt_name = 'dbdemos_dlt_{}_turbine_{}_{}'.format(demo_type, name['first'], name['last'])
 dlt_notebook_paths = [
     f'{notebook_base}/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL',
     f'{notebook_base}/01-Data-Ingestion/01.2-DLT-Navy-GasTurbine-SQL-UDF'
@@ -77,15 +77,15 @@ library_list = [
     pipelines.PipelineLibrary(notebook=pipelines.NotebookLibrary(path=path)) for path in dlt_notebook_paths
 ]
 
-clusters = [
-        pipelines.PipelineCluster(
-            label="default",
-            autoscale=pipelines.PipelineClusterAutoscale.from_dict({
-                "min_workers": 1,
-                "max_workers": 5,
-                "mode": "ENHANCED"
-                })
-        )]
+# clusters = [
+#         pipelines.PipelineCluster(
+#             label="default",
+#             autoscale=pipelines.PipelineClusterAutoscale.from_dict({
+#                 "min_workers": 1,
+#                 "max_workers": 5,
+#                 "mode": "ENHANCED"
+#                 })
+#         )]
 
 def get_pipeline_id_by_name(workspace_client: WorkspaceClient, pipeline_name: str):
     # List all pipelines
@@ -103,14 +103,15 @@ try:
   dlt_pipeline = w.pipelines.create(
       name=dlt_name,
       libraries=library_list,
-      clusters=clusters,
+      # clusters=clusters,
+      serverless=True,
       target=db,
-      photon=False,
       development=True,
       catalog=catalog,
       configuration={
         "catalog": catalog,
-        "db": db
+        "db": db,
+        "demo": demo_type
       },
   )
   dlt_id = dlt_pipeline.pipeline_id
@@ -126,14 +127,10 @@ except Exception as e:
 
 # COMMAND ----------
 
-
-#TODO Possibly create new cluster for user
-
-job_name = "dbdemos_navy_turbine_{}_{}".format(name['first'], name['last'])
-
+# Field Eng West
 job_clusters = [
   jobs.JobCluster.from_dict({
-    "job_cluster_key": "Shared_job_cluster",
+    "job_cluster_key": "pubsec_predictive_maintenance",
     "new_cluster": {
       "spark_version": "15.1.x-cpu-ml-scala2.12",
       "spark_conf": {
@@ -155,29 +152,40 @@ job_clusters = [
       "num_workers": 0
     }
   }),
-  jobs.JobCluster.from_dict({
-    "job_cluster_key": "DLT_fix_cluster",
-    "new_cluster": {
-      "data_security_mode": "DATA_SECURITY_MODE_DEDICATED",
-      "custom_tags": {
-        "project": "dbdemos",
-        "demo": "lakehouse-navy-maintenance"
-      },
-      "kind": "CLASSIC_PREVIEW",
-      "spark_conf": {
-        "spark.databricks.dataLineage.enabled": "true"
-      },
-      "spark_env_vars": {
-        "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
-      },
-      "runtime_engine": "STANDARD",
-      "spark_version": "16.2.x-scala2.12",
-      "instance_pool_id": "0727-104344-hauls13-pool-uftxk0r6",
-      "use_ml_runtime": "true",
-      "is_single_node": "true"
-    }
-  })
 ]
+
+# COMMAND ----------
+
+# Field Eng Demo
+
+# job_clusters = [
+#   jobs.JobCluster.from_dict({
+#     "job_cluster_key": "pubsec_predictive_maintenance",
+#     "new_cluster": {
+#       "data_security_mode": "DATA_SECURITY_MODE_DEDICATED",
+#       "policy_id": "E060384AFC00043E",
+#       "kind": "CLASSIC_PREVIEW",
+#       "spark_env_vars": {
+#         "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+#       },
+#       "aws_attributes": {
+#         "instance_profile_arn": "arn:aws:iam::997819012307:instance-profile/shard-demo-s3-access",
+#         "availability": "SPOT_WITH_FALLBACK"
+#       },
+#       "runtime_engine": "STANDARD",
+#       "spark_version": "16.4.x-scala2.12",
+#       "node_type_id": "rd-fleet.xlarge",
+#       "use_ml_runtime": True,
+#       "is_single_node": False,
+#       "num_workers": 8
+#     }
+#   }),
+# ]
+
+# COMMAND ----------
+
+
+job_name = "dbdemos_navy_turbine_{}_{}".format(name['first'], name['last'])
 
 tasks = [
   jobs.Task.from_dict(
@@ -188,7 +196,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/_resources/01-load-data",
         "source": "WORKSPACE"
       },
-      "job_cluster_key": "DLT_fix_cluster",
+      "job_cluster_key": "pubsec_predictive_maintenance",
       "timeout_seconds": 0,
       "email_notifications": {}
     }),
@@ -222,7 +230,6 @@ tasks = [
         },
         "source": "WORKSPACE"
       },
-      # "existing_cluster_id": uc_table_creator,
       "timeout_seconds": 0,
       "email_notifications": {},
     }),
@@ -238,8 +245,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/04-Data-Science-ML/04.1-automl-iot-turbine-predictive-maintenance",
         "source": "WORKSPACE"
       },
-      #Possibly add Share Americas Autoscaling Cluster
-      "job_cluster_key": "Shared_job_cluster",
+      "job_cluster_key": "pubsec_predictive_maintenance",
       "timeout_seconds": 0,
       "email_notifications": {}
     }),
@@ -255,7 +261,7 @@ tasks = [
         "notebook_path": f"{notebook_base}/04-Data-Science-ML/04.2-AutoML-best-register-model",
         "source": "WORKSPACE"
       },
-      "job_cluster_key": "DLT_fix_cluster",
+      "job_cluster_key": "pubsec_predictive_maintenance",
       "timeout_seconds": 0,
       "email_notifications": {}
     }),
@@ -271,7 +277,6 @@ tasks = [
         "notebook_path": f"{notebook_base}/05-Supply-Optimization/05.1_Optimize_Transportation",
         "source": "WORKSPACE"
       },
-      # "existing_cluster_id": uc_table_creator,
       "timeout_seconds": 0,
       "email_notifications": {}
     }),  
@@ -288,12 +293,3 @@ created_job = w.jobs.create(name=job_name,
 # COMMAND ----------
 
 run_by_id = w.jobs.run_now(job_id=created_job.job_id).result()
-
-# COMMAND ----------
-
-#TODO add dashboard clone 
-
-# dahsboard_uuid = "118f6ea2-f4b9-4ed1-bed1-027efed2ea2a?o=1444828305810485"
-
-# d = w.dashboards.get(dahsboard_uuid)
-# serialized = d.as_dict()

@@ -32,7 +32,6 @@ import pandas as pd
 from math import radians, cos, sin, asin, sqrt
 
 import pyspark.sql.functions as f
-from pyspark.sql.functions import monotonically_increasing_id, col, concat, lit
 from pyspark.sql.types import *
 
 # COMMAND ----------
@@ -45,27 +44,8 @@ from pyspark.sql.types import *
 
 # COMMAND ----------
 
-parts = spark.read.table(f'{catalog}.{db}.parts')
-
-unique_stock_locations = parts.select('stock_location', 'lat', 'long', 'stock_location_id').distinct()
-display(unique_stock_locations)
-
-coordinates = {row['stock_location_id']: (row['lat'], row['long']) for row in unique_stock_locations.collect()}
-
-# COMMAND ----------
-
-ship_meta = spark.read.table(f'{catalog}.{db}.ship_meta')
-unique_home_locations = ship_meta.select('home_location', 'lat', 'long').distinct()
-
-unique_home_locations = unique_home_locations.withColumn(
-    'home_location_id',
-    concat(lit('home_'), monotonically_increasing_id())
-)
-unique_home_locations.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.demand_mapping")
-
-homeport = {row['home_location_id']: (row['lat'], row['long']) for row in unique_home_locations.collect()}
-
-# COMMAND ----------
+import numpy as np
+from math import radians, cos, sin, asin, sqrt
 
 # Haversine formula to calculate distance between two lat/long points
 def haversine(lon1, lat1, lon2, lat2):
@@ -82,20 +62,20 @@ def haversine(lon1, lat1, lon2, lat2):
 
 # Define the latitudes and longitudes for each location
 # Example: {'FLC Jacksonville': (latitude, longitude), ...}
-# coordinates = {
-#     'FLC Jacksonville': (30.39349, -81.410574),
-#     'FLC Norfolk': (36.945, -76.313056),
-#     'FLC Pearl Harbor': (21.3647, -157.9498),
-#     'FLC Puget Sound': (47.6, -122.4),
-#     'FLC San Diego': (32.684722, -117.13)
-# }
+coordinates = {
+    'FLC Jacksonville': (30.39349, -81.410574),
+    'FLC Norfolk': (36.945, -76.313056),
+    'FLC Pearl Harbor': (21.3647, -157.9498),
+    'FLC Puget Sound': (47.6, -122.4),
+    'FLC San Diego': (32.684722, -117.13)
+}
 
-# homeport = {
-#     'NS Mayport': (30.4, -81.4),
-#     'NB Norfolk': (36.9, -76.3),
-#     'NS Pearl Harbor': (21.4, -157.9),
-#     'NB San Diego': (32.7, -117.1)
-# }
+homeport = {
+    'NS Mayport': (30.4, -81.4),
+    'NB Norfolk': (36.9, -76.3),
+    'NS Pearl Harbor': (21.4, -157.9),
+    'NB San Diego': (32.7, -117.1)
+}
 # Initialize an empty adjacency matrix
 n = len(coordinates)
 m = len(homeport)
@@ -154,7 +134,7 @@ ranked_spark_df.write.format("delta").mode("overwrite").saveAsTable("shipping_co
 
 # COMMAND ----------
 
-parts = spark.read.table(f'{catalog}.{db}.parts').select('type', 'stock_location_id').orderBy('type')
+parts = spark.read.table(f'{catalog}.{db}.parts').select('type', 'stock_location').orderBy('type')
 display(parts)
 
 # COMMAND ----------
@@ -164,58 +144,28 @@ display(parts)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import hash, abs
-
-ships = (ship_meta.withColumn('designator_id', abs(hash('designator')))
-         .join(unique_home_locations, on='home_location')
-)
-
+ships = spark.read.table(f'{catalog}.{db}.ship_meta').select('designator','home_location').distinct()
 ships.display()
-
-# COMMAND ----------
-
-ships = ships.select('designator_id','home_location_id').distinct()
-ships.display()
-# Remove, defined earlier
 cost = pd.DataFrame(ranked, columns=[s for s in homeport.keys()])
-cost['stock_location_id'] = list(coordinates.keys())
+cost['stock_location'] = list(coordinates.keys())
 
 cost = spark.createDataFrame(cost)
+print('cost')
+cost.display()
+
+cost = cost.selectExpr('stock_location', 'stack(4, "NS Mayport", `NS Mayport`, "NB Norfolk", `NB Norfolk`, "NS Pearl Harbor", `NS Pearl Harbor`, "NB San Diego", `NB San Diego`) as (home_location, cost)')
 
 cost.display()
 
-columns_to_stack = [col for col in cost.columns if col != 'stock_location_id']
-
-# Number of columns to stack
-num_columns = len(columns_to_stack)
-
-# Generate the stack arguments
-stack_args = []
-for col_name in columns_to_stack:
-    stack_args.append(f'"{col_name}"')
-    stack_args.append(f'`{col_name}`')
-
-# Join the stack arguments into a single string
-stack_args_str = ', '.join(stack_args)
-
-# Create the selectExpr string
-select_expr_str = f'stack({num_columns}, {stack_args_str}) as (home_location_id, cost)'
-
-# Apply the selectExpr
-cost = cost.selectExpr('stock_location_id', select_expr_str)
-cost.display()
-
-cost_ship = cost.join(ships, on='home_location_id').join(parts, on='stock_location_id')
+cost_ship = cost.join(ships, on='home_location').join(parts, on='stock_location')
+print('cost ship 1')
 cost_ship.display()
 
-cost_ship = cost_ship.groupBy('type', 'stock_location_id').pivot('designator_id').agg({'cost': 'first'})
+cost_ship = cost_ship.groupBy('type', 'stock_location').pivot('designator').agg({'cost': 'first'})
 cost_ship.display()
 
-for name in cost_ship.schema.names: 
-    if name == 'type' or name == 'stock_location_id':
-        continue
-    cost_ship = cost_ship.withColumnRenamed(name, "Cost_"+name)
-
+for name in cost_ship.schema.names:
+  cost_ship = cost_ship.withColumnRenamed(name, name.replace("USS", "Cost_USS"))
 
 display(cost_ship.orderBy('type'))
 
@@ -227,12 +177,10 @@ display(cost_ship.orderBy('type'))
 
 # COMMAND ----------
 
-supply = spark.read.table(f'{catalog}.{db}.parts').select('stock_location_id', 'stock_available', 'type')
-supply = supply.groupBy('type').pivot('stock_location_id').agg({'stock_available':'first'})
+supply = spark.read.table(f'{catalog}.{db}.parts').select('stock_location', 'stock_available', 'type')
+supply = supply.groupBy('type').pivot('stock_location').agg({'stock_available':'first'})
 for name in supply.schema.names:
-  if name == 'type':
-    continue
-  supply = supply.withColumnRenamed(name,"Supply_"+name)
+  supply = supply.withColumnRenamed(name, name.replace("FLC", "Supply_FLC"))
 display(supply)
 
 # COMMAND ----------
@@ -242,42 +190,52 @@ display(supply)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, array_join, find_in_set
+spark.sql(
+  f"""
+  USE CATALOG {catalog}
+  """
+  )
+spark.sql(
+  f"""
+  USE SCHEMA {db}
+  """
+  )
 
-ship_status = spark.read.table(f"{catalog}.{db}.ship_current_status_gold").withColumn('designator_id', abs(hash('designator')))
+# COMMAND ----------
 
-parts_df = spark.read.table(f"{catalog}.{db}.parts")
 
-joined = ship_status.join(
-    parts_df,
-    (col("prediction").isNotNull()) &
-    (col("sensors").isNotNull()) &
-    (find_in_set(col("prediction"), array_join(col("sensors"), ",")) > 0),
-    how="left"
-)
+query = f"""
+CREATE OR REPLACE TEMP VIEW parts_demand AS
+SELECT DISTINCT s.designator, s.turbine_id, p.type AS parts 
+FROM {catalog}.{db}.ship_current_status_gold AS s
+LEFT JOIN {catalog}.{db}.parts p
+ON s.prediction IS NOT NULL 
+  AND p.sensors IS NOT NULL 
+  AND find_in_set(s.prediction, array_join(p.sensors, ',')) > 0;
+"""
+spark.sql(query)
 
-parts_demand = joined.select("designator_id", "turbine_id", col("type").alias("parts")).distinct()
-display(parts_demand)
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT * FROM parts_demand
 
 # COMMAND ----------
 
 import pyspark.sql.functions as f
 
-# demand = spark.sql("SELECT ship, parts, COUNT(parts) AS demand FROM parts_demand GROUP BY ship, parts ORDER BY ship")
+demand = spark.sql("SELECT designator, parts, COUNT(parts) AS demand FROM parts_demand GROUP BY designator, parts ORDER BY designator")
 
-demand = parts_demand.groupBy("designator_id", "parts") \
-                      .agg(f.count("parts").alias("demand")) \
-                      .orderBy("designator_id")
-
-demand = demand.groupBy('parts').pivot("designator_id").agg(f.first("demand").alias("demand"))
+demand = demand.groupBy('parts').pivot("designator").agg(f.first("demand").alias("demand"))
 
 for name in demand.schema.names:
   if name == 'parts':
     demand = demand.withColumnRenamed(name, name.replace("parts", "type"))
-  demand = demand.withColumnRenamed(name, "Demand_"+name)
+  demand = demand.withColumnRenamed(name, name.replace("USS", "Demand_USS"))
 
 demand = demand.filter(demand.type.isNotNull())
 
+display(demand)
 
 # COMMAND ----------
 
@@ -289,20 +247,20 @@ demand = demand.filter(demand.type.isNotNull())
 
 # COMMAND ----------
 
+import re
+
 lp_table = (cost_ship.
             join(supply, ["type"], how='inner').
             join(demand, ["type"], how='inner').
             fillna(0)
 )
 
-# pattern = pattern = r"\(.*?\)"
-# for name in lp_table.schema.names:
-#   new = re.sub(pattern, "", name).replace(" ", "_")
-#   lp_table = lp_table.withColumnRenamed(name, new)
+pattern = pattern = r"\(.*?\)"
+for name in lp_table.schema.names:
+  new = re.sub(pattern, "", name).replace(" ", "_")
+  lp_table = lp_table.withColumnRenamed(name, new)
 
 display(lp_table.orderBy('type'))
-
-lp_table.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.lp_table")
 
 # COMMAND ----------
 
@@ -314,18 +272,18 @@ lp_table.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.lp
 
 # COMMAND ----------
 
-# # Step 1: Identify the invalid characters
-# invalid_chars = [' ', ',', ';', '{', '}', '(', ')', '\n', '\t', '=', '.', '-', "'"]
+# Step 1: Identify the invalid characters
+invalid_chars = [' ', ',', ';', '{', '}', '(', ')', '\n', '\t', '=', '.', '-', "'"]
 
-# # Step 2: Rename the columns with valid characters
-# new_column_names = [col for col in lp_table.columns]
-# for invalid_char in invalid_chars:
-#   if invalid_char == '-':
-#     new_column_names = [col.replace(invalid_char, '_') for col in new_column_names]
-#   else:
-#     new_column_names = [col.replace(invalid_char, '') for col in new_column_names]
+# Step 2: Rename the columns with valid characters
+new_column_names = [col for col in lp_table.columns]
+for invalid_char in invalid_chars:
+  if invalid_char == '-':
+    new_column_names = [col.replace(invalid_char, '_') for col in new_column_names]
+  else:
+    new_column_names = [col.replace(invalid_char, '') for col in new_column_names]
 
-# new_lp_table = lp_table.toDF(*new_column_names)
+new_lp_table = lp_table.toDF(*new_column_names)
 
 # COMMAND ----------
 
@@ -334,13 +292,13 @@ lp_table.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.lp
 
 # COMMAND ----------
 
-# # Convert the delta table to Delta Live Table
-# new_lp_table.createOrReplaceTempView("temp_table")
-# spark.sql(f"CREATE OR REPLACE TABLE {catalog}.{db}.lp_table AS SELECT * FROM temp_table")
+# Convert the delta table to Delta Live Table
+new_lp_table.createOrReplaceTempView("temp_table")
+spark.sql(f"CREATE OR REPLACE TABLE {catalog}.{db}.lp_table AS SELECT * FROM temp_table")
 
 # COMMAND ----------
 
-# display(spark.sql(f"SELECT * FROM {catalog}.{db}.lp_table"))
+display(spark.sql(f"SELECT * FROM {catalog}.{db}.lp_table"))
 
 # COMMAND ----------
 

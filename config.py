@@ -9,11 +9,42 @@
 
 # COMMAND ----------
 
-catalog = "ahahn_demo"
-schema = dbName = db = "dbdemos_navy_pdm"
-volume_name = "navy_raw_landing"
+dbutils.widgets.dropdown("sector", "pubsec", ["pubsec", "navy"], "Select Sector")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Set Catalog, DB, Volume
+
+# COMMAND ----------
+
+catalog = "public_sector"
+# schema = dbName = db = "predictive_maintenance_pubsec"
+volume_name = "raw_landing"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Set Demo Type
+
+# COMMAND ----------
 
 
-# catalog = dbutils.widgets.get("catalog")
-# schema = dbName = db = dbutils.widgets.get("db")
-# volume_name = dbutils.widgets.get("volume")
+demo_type = "navy"
+
+if demo_type == "pubsec":
+  schema = dbName = db = "predictive_maintenance_pubsec"
+elif demo_type == "DoD":
+  schema = dbName = db = "predictive_maintenance_DoD"
+elif demo_type == "navy":
+  schema = dbName = db = "predictive_maintenance_navy"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # Set ML Variables
+
+# COMMAND ----------
+
+experiment_name = "pubsec_predictive_maintenance"
+model_name = "predictive_maintenance_model"

@@ -1,0 +1,4042 @@
+{
+  "datasets": [
+    {
+      "name": "f261bf85",
+      "displayName": "Current Turbine Status",
+      "queryLines": [
+        "SELECT \n",
+        "  turbine_id, \n",
+        "  hourly_timestamp, \n",
+        "  avg_energy, \n",
+        "  std_sensor_A, \n",
+        "  std_sensor_B, \n",
+        "  std_sensor_C, \n",
+        "  std_sensor_D, \n",
+        "  std_sensor_E, \n",
+        "  std_sensor_F, \n",
+        "  percentiles_sensor_A, \n",
+        "  percentiles_sensor_B, \n",
+        "  percentiles_sensor_C, \n",
+        "  percentiles_sensor_D, \n",
+        "  percentiles_sensor_E, \n",
+        "  percentiles_sensor_F, \n",
+        "  country, \n",
+        "  CAST(lat AS DOUBLE) AS lat, \n",
+        "  location, \n",
+        "  CAST(long AS DOUBLE) AS long, \n",
+        "  model, \n",
+        "  state, \n",
+        "  _rescued_data, \n",
+        "  prediction \n",
+        "FROM turbine_current_status;"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "8f4e7b0e",
+      "displayName": "Turbine sensors",
+      "queryLines": [
+        "SELECT \n",
+        "  from_unixtime(timestamp) as timestamp_datetime, \n",
+        "  * \n",
+        "FROM sensor_bronze;"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "56022a56",
+      "displayName": "Ship GTE Readiness",
+      "queryLines": [
+        "SELECT designator, home_location, lat, long,\n",
+        "    CASE \n",
+        "        WHEN MAX(CASE WHEN operable = 'false' THEN 1 ELSE 0 END) >= 1 THEN 'red'\n",
+        "        WHEN COUNT(fault) >= 1 THEN 'yellow'\n",
+        "        ELSE 'green'\n",
+        "    END AS status \n",
+        "FROM ship_current_status_gold\n",
+        "GROUP BY ALL;"
+      ],
+      "columns": [
+        {
+          "displayName": "Status - Green",
+          "description": "",
+          "expression": "CASE\nWHEN status == 'green' THEN 1 \nELSE 0\nEND"
+        },
+        {
+          "displayName": "Status - Yellow",
+          "description": "",
+          "expression": "CASE\nWHEN status == 'yellow' THEN 1 ELSE 0\nEND"
+        },
+        {
+          "displayName": "Status - Red",
+          "description": "",
+          "expression": "CASE\nWHEN status == 'red' THEN 1 ELSE 0\nEND"
+        }
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "b03817ba",
+      "displayName": "Faulty Parts Count",
+      "queryLines": [
+        "SELECT COUNT(*) num_faults, p.type FROM ship_current_status_gold AS s\n",
+        "LEFT JOIN parts p\n",
+        "ON find_in_set(s.prediction, array_join(p.sensors, ',')) > 0\n",
+        "WHERE prediction != 'ok' AND type IS NOT NULL\n",
+        "GROUP BY ALL"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "5b753ffe",
+      "displayName": "Ship GTE faulty",
+      "queryLines": [
+        "select * from ship_current_status_gold where prediction != 'ok'"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "a4f03de4",
+      "displayName": "Stock Deficit by Location",
+      "queryLines": [
+        "WITH s AS (\n",
+        "    SELECT prediction, home_location, COUNT(*) num_faults\n",
+        "    FROM ship_current_status_gold\n",
+        "    GROUP BY prediction, home_location\n",
+        "), \n",
+        "p AS (\n",
+        "    SELECT stock_location, parts.type part, stock_available stock, \n",
+        "            CASE \n",
+        "                WHEN stock_location = 'FLC Norfolk' THEN 'NB Norfolk'\n",
+        "                WHEN stock_location = 'FLC Jacksonville' THEN 'NS Mayport'\n",
+        "                WHEN stock_location = 'FLC San Diego' THEN 'NB San Diego'\n",
+        "                WHEN stock_location = 'FLC Pearl Harbor' THEN 'NS Pearl Harbor'\n",
+        "                WHEN stock_location = 'FLC Puget Sound' THEN 'NB San Diego'\n",
+        "            END nearest_homeport\n",
+        "            , sensor  -- Include a new column to store the exploded sensor value\n",
+        "    FROM parts\n",
+        "    LATERAL VIEW explode(sensors) p_ex AS sensor\n",
+        ")\n",
+        "\n",
+        "SELECT p.stock_location, p.part, p.stock, s.home_location, (s.num_faults - p.stock) AS deficit\n",
+        "FROM s\n",
+        "LEFT JOIN p ON s.prediction = p.sensor AND p.nearest_homeport = s.home_location\n",
+        "WHERE (s.num_faults - p.stock) > 0 AND (s.num_faults - p.stock) IS NOT NULL;"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "e94523f9",
+      "displayName": "ship_current_status_gold",
+      "queryLines": [
+        "SELECT * \n",
+        "EXCEPT (lat, long), \n",
+        "CAST(lat AS DOUBLE) AS lat, \n",
+        "CAST(long AS DOUBLE) AS long \n",
+        "FROM ship_current_status_gold"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "04bc5e97",
+      "displayName": "Shipment with Home Location",
+      "queryLines": [
+        "WITH homes AS (\n",
+        "  SELECT DISTINCT designator, home_location \n",
+        "  FROM ship_meta\n",
+        ")\n",
+        "SELECT qty_shipped, type, stock_location, shipment_recommendations.designator, homes.home_location \n",
+        "FROM shipment_recommendations\n",
+        "JOIN homes ON shipment_recommendations.designator = homes.designator\n",
+        "WHERE qty_shipped > 0"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    }
+  ],
+  "pages": [
+    {
+      "name": "afc3dbb2",
+      "displayName": "Readiness",
+      "layout": [
+        {
+          "widget": {
+            "name": "083e90b2",
+            "queries": [
+              {
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bdee621e63a83fd17011af8df8_home_location",
+                "query": {
+                  "datasetName": "56022a56",
+                  "fields": [
+                    {
+                      "name": "home_location",
+                      "expression": "`home_location`"
+                    },
+                    {
+                      "name": "home_location_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "home_location",
+                    "displayName": "home_location",
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bdee621e63a83fd17011af8df8_home_location"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Readiness - Homeport",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "9fa94718",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "56022a56",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "avg(Status - Yellow)",
+                      "expression": "AVG(`Status - Yellow`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(Status - Yellow)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Average Status - Yellow"
+                },
+                "target": {
+                  "fieldName": "count(*)",
+                  "displayName": "Count of Records"
+                }
+              },
+              "frame": {
+                "title": "GTE Readiness",
+                "showTitle": true,
+                "description": "Need Maintenance\nTotal fleet GTEs predicted to require maintenance",
+                "showDescription": true
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "960b044c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "56022a56",
+                  "fields": [
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "home_location",
+                      "expression": "`home_location`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "designator",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 0,
+                    "title": "designator",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "designator"
+                  },
+                  {
+                    "fieldName": "status",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "title": "status",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "status"
+                  },
+                  {
+                    "fieldName": "home_location",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 4,
+                    "title": "home_location",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "home_location"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "lat",
+                  "type": "float",
+                  "displayAs": "string",
+                  "order": 2,
+                  "title": "lat",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "long",
+                  "type": "float",
+                  "displayAs": "string",
+                  "order": 3,
+                  "title": "long",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "Status - Green",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 5,
+                  "title": "Status - Green",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "Status - Yellow",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 6,
+                  "title": "Status - Yellow",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "Status - Red",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 7,
+                  "title": "Status - Red",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "title": "Readiness by ship",
+                "showTitle": true,
+                "description": "Readiness status by ship - filterable by homeport\n",
+                "showDescription": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 6,
+            "width": 3,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "74649555",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "56022a56",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "count(status)",
+                      "expression": "COUNT(`status`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "y": {
+                  "fieldName": "count(status)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Total Ships"
+                  },
+                  "displayName": "Total Ships"
+                },
+                "color": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "green",
+                        "color": "#00A972"
+                      },
+                      {
+                        "value": "red",
+                        "color": "#FF3621"
+                      },
+                      {
+                        "value": "yellow",
+                        "color": "#FFAB00"
+                      }
+                    ]
+                  },
+                  "legend": {
+                    "hide": true
+                  },
+                  "displayName": "status"
+                }
+              },
+              "frame": {
+                "title": "Ship Plant Status - Ship GTE Map",
+                "showTitle": true,
+                "description": "Total ships by readiness status - filterable by homeport\n",
+                "showDescription": true
+              },
+              "mark": {
+                "layout": "group"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 3,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "c8c1a239",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "56022a56",
+                  "fields": [
+                    {
+                      "name": "countdistinct(designator)",
+                      "expression": "COUNT(DISTINCT `designator`)"
+                    },
+                    {
+                      "name": "avg(Status - Green)",
+                      "expression": "AVG(`Status - Green`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(Status - Green)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Average Status - Green"
+                },
+                "target": {
+                  "fieldName": "countdistinct(designator)",
+                  "displayName": "Count of Unique designator"
+                }
+              },
+              "frame": {
+                "title": "GTE Readiness",
+                "showTitle": true,
+                "description": "Fully Operational\nTotal GTEs that are fully operational",
+                "showDescription": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "af6f836d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "56022a56",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "sum(Status - Red)",
+                      "expression": "SUM(`Status - Red`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(Status - Red)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 0
+                    }
+                  },
+                  "displayName": "Sum of Status - Red"
+                },
+                "target": {
+                  "fieldName": "count(*)",
+                  "displayName": "Count of Records"
+                }
+              },
+              "frame": {
+                "title": "GTE Readiness",
+                "showTitle": true,
+                "description": "CASREP GTEs\nTotal number of predicted inoperable GTEs",
+                "showDescription": true
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "cab3f109",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Commanders Readiness Dashboard\n",
+                "\n",
+                "This dashboard provides an overview of the readiness of gas turbine engines on ships filterable by homeport. The chart shows the breakdown of engines that are operable, in need of maintenance, and inoperable. The parts analysis and supply routing table are filterable by part type"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "9e14db82",
+      "displayName": "Logistics Analysis",
+      "layout": [
+        {
+          "widget": {
+            "name": "8841a835",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "04bc5e97",
+                  "fields": [
+                    {
+                      "name": "stock_location",
+                      "expression": "`stock_location`"
+                    },
+                    {
+                      "name": "home_location",
+                      "expression": "`home_location`"
+                    },
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    },
+                    {
+                      "name": "sum(qty_shipped)",
+                      "expression": "SUM(`qty_shipped`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "sankey",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(qty_shipped)",
+                  "displayName": "Sum of qty_shipped"
+                },
+                "stages": [
+                  {
+                    "fieldName": "stock_location",
+                    "displayName": "stock_location"
+                  },
+                  {
+                    "fieldName": "home_location",
+                    "displayName": "home_location"
+                  },
+                  {
+                    "fieldName": "designator",
+                    "displayName": "designator"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Stock Routing - Stock Location - Homport - Ship"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "1b106fdb",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a4f03de4",
+                  "fields": [
+                    {
+                      "name": "part",
+                      "expression": "`part`"
+                    },
+                    {
+                      "name": "stock_location",
+                      "expression": "`stock_location`"
+                    },
+                    {
+                      "name": "sum(deficit)",
+                      "expression": "SUM(`deficit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "stock_location",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "displayName": "stock_location"
+                },
+                "y": {
+                  "fieldName": "sum(deficit)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of deficit"
+                },
+                "color": {
+                  "fieldName": "part",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "part"
+                }
+              },
+              "frame": {
+                "title": "Stock Deficit by Location",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 13,
+            "width": 3,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "4b113d99",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "04bc5e97",
+                  "fields": [
+                    {
+                      "name": "type",
+                      "expression": "`type`"
+                    },
+                    {
+                      "name": "stock_location",
+                      "expression": "`stock_location`"
+                    },
+                    {
+                      "name": "qty_shipped",
+                      "expression": "`qty_shipped`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "type",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "type",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "type"
+                  },
+                  {
+                    "fieldName": "stock_location",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "stock_location",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "stock_location"
+                  },
+                  {
+                    "fieldName": "qty_shipped",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "qty_shipped",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "qty_shipped"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "designator",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100003,
+                  "title": "designator",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100004,
+                  "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "showTitle": true,
+                "title": "Optimal Parts Routing",
+                "showDescription": true,
+                "description": "Suggested parts routing table based on forecasted demand and supply routing optimization"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "eb6f59af",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Parts Management + Supply Chain Optimization \n",
+                "\n",
+                "Based on our Predictive maintenance model and our stock status, we are able to provide recommendation to better organize our stock and potentially adjust spare parts command.  \n",
+                "\n",
+                "The potential use-cases and potential revenue optimizations are huge. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "6f7c68af",
+            "queries": [
+              {
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bf37431be8aead71ec9ca25c2c_type",
+                "query": {
+                  "datasetName": "04bc5e97",
+                  "fields": [
+                    {
+                      "name": "type",
+                      "expression": "`type`"
+                    },
+                    {
+                      "name": "type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bedcb019dd8b124dadf2a2012a_part",
+                "query": {
+                  "datasetName": "a4f03de4",
+                  "fields": [
+                    {
+                      "name": "part",
+                      "expression": "`part`"
+                    },
+                    {
+                      "name": "part_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "type",
+                    "displayName": "type",
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bf37431be8aead71ec9ca25c2c_type"
+                  },
+                  {
+                    "fieldName": "part",
+                    "displayName": "part",
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bedcb019dd8b124dadf2a2012a_part"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Component Type"
+              },
+              "disallowAll": false
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "43b6ea16",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a4f03de4",
+                  "fields": [
+                    {
+                      "name": "part",
+                      "expression": "`part`"
+                    },
+                    {
+                      "name": "stock",
+                      "expression": "`stock`"
+                    },
+                    {
+                      "name": "deficit",
+                      "expression": "`deficit`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "part",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "part",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "part"
+                  },
+                  {
+                    "fieldName": "stock",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "stock",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "stock"
+                  },
+                  {
+                    "fieldName": "deficit",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "deficit",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "deficit"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100004,
+                  "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "stock_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100000,
+                  "title": "stock_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "title": "Deficit Table - Stock Deficit by Location",
+                "showTitle": true,
+                "description": "Stock deficits based on demand forecast",
+                "showDescription": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 3,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "92712daf",
+      "displayName": "Maintenance Analysis",
+      "layout": [
+        {
+          "widget": {
+            "name": "1417a196",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5b753ffe",
+                  "fields": [
+                    {
+                      "name": "fault",
+                      "expression": "`fault`"
+                    },
+                    {
+                      "name": "turbine_id",
+                      "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "designator",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "labelAngle": 45
+                  },
+                  "displayName": "designator"
+                },
+                "y": {
+                  "fieldName": "fault",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "fault"
+                },
+                "color": {
+                  "fieldName": "fault",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "sensor_F",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      }
+                    ]
+                  },
+                  "displayName": "fault"
+                },
+                "label": {
+                  "show": false
+                },
+                "extra": [
+                  {
+                    "fieldName": "turbine_id",
+                    "displayName": "turbine_id"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "2654cdcc",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Maintenance Analysis - Global Platform, Asset, and Parts \n",
+                "\n",
+                "Based on our Predictive maintenance model and our stock status, we are able to provide recommendation to better organize our stock and potentially adjust spare parts command.  \n",
+                "\n",
+                "The potential use-cases and potential revenue optimizations are huge. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "6e63f39a",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5b753ffe",
+                  "fields": [
+                    {
+                      "name": "fault",
+                      "expression": "`fault`"
+                    },
+                    {
+                      "name": "turbine_id",
+                      "expression": "`turbine_id`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "fault",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "title": "fault",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "fault"
+                  },
+                  {
+                    "fieldName": "turbine_id",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 4,
+                    "title": "turbine_id",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "turbine_id"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "dateTimeFormat": "DD/MM/YY HH:mm:ss.SSS",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "hourly_timestamp",
+                  "type": "datetime",
+                  "displayAs": "datetime",
+                  "order": 2,
+                  "title": "hourly_timestamp",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "prediction",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 5,
+                  "title": "prediction",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "lat",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 6,
+                  "title": "lat",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "long",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 7,
+                  "title": "long",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "model",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 8,
+                  "title": "model",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "_rescued_data",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 9,
+                  "title": "_rescued_data",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "operable",
+                  "type": "boolean",
+                  "displayAs": "boolean",
+                  "order": 11,
+                  "title": "operable",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "ttr",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 12,
+                  "title": "ttr",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "designator",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100003,
+                  "title": "designator",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "designator_id",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 100004,
+                  "title": "designator_id",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100005,
+                  "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "maintenance_type",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100011,
+                  "title": "maintenance_type",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "title": "Ship GTEs with Predicted Default",
+                "showTitle": true,
+                "description": "The following GTEs have a potential default should have maintenance conducted",
+                "showDescription": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 11,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "72f3d606",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b03817ba",
+                  "fields": [
+                    {
+                      "name": "sum(num_faults)",
+                      "expression": "SUM(`num_faults`)"
+                    },
+                    {
+                      "name": "type",
+                      "expression": "`type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(num_faults)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Faulty Parts by Percentage"
+                },
+                "color": {
+                  "fieldName": "type",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "anemometer",
+                        "color": "#5C62D6"
+                      },
+                      {
+                        "value": "Brake",
+                        "color": "#6B9AC4"
+                      },
+                      {
+                        "value": "Yaw drive",
+                        "color": "#F4B942"
+                      },
+                      {
+                        "value": "blade",
+                        "color": "#5C62D6"
+                      },
+                      {
+                        "value": "controller card #1",
+                        "color": "#97D8C4"
+                      },
+                      {
+                        "value": "controller card #2",
+                        "color": "#EFF2F1"
+                      },
+                      {
+                        "value": "electronic guidance system",
+                        "color": "#B9E28C"
+                      }
+                    ]
+                  },
+                  "displayName": "type"
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "frame": {
+                "title": "Recurrent equipment default over the last year",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 3,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "9878afa8",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5b753ffe",
+                  "fields": [
+                    {
+                      "name": "sum(ttr)",
+                      "expression": "SUM(`ttr`)"
+                    },
+                    {
+                      "name": "turbine_id",
+                      "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    },
+                    {
+                      "name": "ttr",
+                      "expression": "`ttr`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "designator",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "axis": {
+                    "labelAngle": 45
+                  },
+                  "displayName": "designator"
+                },
+                "y": {
+                  "fieldName": "ttr",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "ttr"
+                },
+                "color": {
+                  "fieldName": "sum(ttr)",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "reds"
+                    },
+                    "domain": {
+                      "max": 50,
+                      "min": 0
+                    }
+                  },
+                  "displayName": "Sum of ttr"
+                },
+                "label": {
+                  "show": true
+                },
+                "extra": [
+                  {
+                    "fieldName": "turbine_id",
+                    "displayName": "turbine_id"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Time to Repair by Ship",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "aea00482",
+            "queries": [
+              {
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bec7cf18ccb14611252c0c5ea9_designator",
+                "query": {
+                  "datasetName": "5b753ffe",
+                  "fields": [
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    },
+                    {
+                      "name": "designator_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bef0971b459903230a81217308_designator",
+                "query": {
+                  "datasetName": "e94523f9",
+                  "fields": [
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    },
+                    {
+                      "name": "designator_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "designator",
+                    "displayName": "designator",
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bec7cf18ccb14611252c0c5ea9_designator"
+                  },
+                  {
+                    "fieldName": "designator",
+                    "displayName": "designator",
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bef0971b459903230a81217308_designator"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "81d25b42",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "e94523f9",
+                  "fields": [
+                    {
+                      "name": "turbine_id",
+                      "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "fault",
+                      "expression": "`fault`"
+                    },
+                    {
+                      "name": "operable",
+                      "expression": "`operable`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "turbine_id",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "title": "turbine_id",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "turbine_id"
+                  },
+                  {
+                    "fieldName": "fault",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 2,
+                    "title": "fault",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "fault"
+                  },
+                  {
+                    "fieldName": "operable",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "boolean",
+                    "displayAs": "boolean",
+                    "visible": true,
+                    "order": 3,
+                    "title": "operable",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "operable"
+                  }
+                ]
+              },
+              "invisibleColumns": [
+                {
+                  "dateTimeFormat": "DD/MM/YY HH:mm:ss.SSS",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "hourly_timestamp",
+                  "type": "datetime",
+                  "displayAs": "datetime",
+                  "order": 4,
+                  "title": "hourly_timestamp",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "prediction",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 5,
+                  "title": "prediction",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "model",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 7,
+                  "title": "model",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "_rescued_data",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 8,
+                  "title": "_rescued_data",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "ttr",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 10,
+                  "title": "ttr",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "lat",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 12,
+                  "title": "lat",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "long",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 13,
+                  "title": "long",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "designator",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100003,
+                  "title": "designator",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "designator_id",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 100004,
+                  "title": "designator_id",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100005,
+                  "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "maintenance_type",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100009,
+                  "title": "maintenance_type",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Global turbine status",
+                "description": "Status of all turbines both with and without faults"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "eb2c9934",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5b753ffe",
+                  "fields": [
+                    {
+                      "name": "count(maintenance_type)",
+                      "expression": "COUNT(`maintenance_type`)"
+                    },
+                    {
+                      "name": "maintenance_type",
+                      "expression": "`maintenance_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(maintenance_type)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of maintenance_type"
+                },
+                "color": {
+                  "fieldName": "maintenance_type",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "maintenance_type"
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Maintenance Activity type Breakdown",
+                "description": "Level of maintenance activity"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 16,
+            "width": 3,
+            "height": 9
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "00bff356",
+      "displayName": "Equipment Analysis",
+      "layout": [
+        {
+          "widget": {
+            "name": "1f9a01f6",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Asset Analysis\n",
+                "Select the asset to analyze"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "ff997b36",
+            "queries": [
+              {
+                "name": "dashboards/01f051dbbeaa1ba3a285031bf1ecf85c/datasets/01f055da071d183e823302e176bff080_turbine_id",
+                "query": {
+                  "datasetName": "f261bf85",
+                  "fields": [
+                    {
+                      "name": "turbine_id",
+                      "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "turbine_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f051dbbeaa1ba3a285031bf1ecf85c/datasets/01f055dbccf51734bce50edbfeae373a_turbine_id",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "turbine_id",
+                      "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "turbine_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "turbine_id",
+                    "displayName": "turbine_id",
+                    "queryName": "dashboards/01f051dbbeaa1ba3a285031bf1ecf85c/datasets/01f055da071d183e823302e176bff080_turbine_id"
+                  },
+                  {
+                    "fieldName": "turbine_id",
+                    "displayName": "turbine_id",
+                    "queryName": "dashboards/01f051dbbeaa1ba3a285031bf1ecf85c/datasets/01f055dbccf51734bce50edbfeae373a_turbine_id"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Asset ID"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "90acfcea",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "e94523f9",
+                  "fields": [
+                    {
+                      "name": "model",
+                      "expression": "`model`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "model",
+                  "displayName": "model"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Model - IOT platform - asset status",
+                "description": "Failure mode"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "edfea2aa",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f261bf85",
+                  "fields": [
+                    {
+                      "name": "prediction",
+                      "expression": "`prediction`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`turbine_id` IN (`turbine_id`) OR TRUE"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "prediction",
+                  "displayName": "prediction"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Status - IOT platform - asset status",
+                "description": "Status"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "c869489f",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f261bf85",
+                  "fields": [
+                    {
+                      "name": "avg_energy",
+                      "expression": "`avg_energy`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_energy",
+                  "displayName": "avg_energy"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Current energy consumption in MW",
+                "title": "energy - IOT platform - asset status"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "17b50497",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(energy)",
+                      "expression": "SUM(`energy`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "area",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Timestamp",
+                    "hideLabels": false
+                  },
+                  "displayName": "Timestamp"
+                },
+                "y": {
+                  "fieldName": "sum(energy)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Instant Energy Consumed"
+                  },
+                  "displayName": "Instant Energy Consumed"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Energy consumption",
+                "showDescription": true
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "2623a8ce",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(sensor_A)",
+                      "expression": "SUM(`sensor_A`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "timestamp_datetime"
+                },
+                "y": {
+                  "fieldName": "sum(sensor_A)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of sensor_A"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "1e96af21",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "bin(sensor_A, binWidth=2)",
+                      "expression": "BIN_FLOOR(`sensor_A`, 2)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(sensor_A, binWidth=2)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "sensor_A"
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Records"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 12,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "30375a0c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(sensor_D)",
+                      "expression": "SUM(`sensor_D`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "timestamp_datetime"
+                },
+                "y": {
+                  "fieldName": "sum(sensor_D)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of sensor_D"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 30,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "fbc6b7f8",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(sensor_D)",
+                      "expression": "SUM(`sensor_D`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "timestamp_datetime"
+                },
+                "y": {
+                  "fieldName": "sum(sensor_D)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of sensor_D"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 42,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "b1e8be1b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(sensor_C)",
+                      "expression": "SUM(`sensor_C`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "timestamp_datetime"
+                },
+                "y": {
+                  "fieldName": "sum(sensor_C)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of sensor_C"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "aa1d27f3",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(sensor_B)",
+                      "expression": "SUM(`sensor_B`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "timestamp_datetime"
+                },
+                "y": {
+                  "fieldName": "sum(sensor_B)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of sensor_B"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "f2a8ac22",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "timestamp_datetime",
+                      "expression": "`timestamp_datetime`"
+                    },
+                    {
+                      "name": "sum(sensor_E)",
+                      "expression": "SUM(`sensor_E`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "timestamp_datetime",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "timestamp_datetime"
+                },
+                "y": {
+                  "fieldName": "sum(sensor_E)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of sensor_E"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 36,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "549bf923",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "bin(sensor_F, binWidth=2)",
+                      "expression": "BIN_FLOOR(`sensor_F`, 2)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(sensor_F, binWidth=2)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "sensor_F"
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Records"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 30,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "03d01e40",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "bin(sensor_E, binWidth=5)",
+                      "expression": "BIN_FLOOR(`sensor_E`, 5)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(sensor_E, binWidth=5)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "sensor_E"
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Records"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 36,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cc4364fd",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "bin(sensor_D, binWidth=2)",
+                      "expression": "BIN_FLOOR(`sensor_D`, 2)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(sensor_D, binWidth=2)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "sensor_D"
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Records"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 42,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "ce671ad4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "bin(sensor_C, binWidth=5)",
+                      "expression": "BIN_FLOOR(`sensor_C`, 5)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(sensor_C, binWidth=5)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "sensor_C"
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Records"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 24,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "73ed9e4b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8f4e7b0e",
+                  "fields": [
+                    {
+                      "name": "bin(sensor_B, binWidth=5)",
+                      "expression": "BIN_FLOOR(`sensor_B`, 5)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(sensor_B, binWidth=5)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "sensor_B"
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Records"
+                }
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 18,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "c790c71c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "e94523f9",
+                  "fields": [
+                    {
+                      "name": "lat",
+                      "expression": "`lat`"
+                    },
+                    {
+                      "name": "long",
+                      "expression": "`long`"
+                    },
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
+                    },
+                    {
+                      "name": "home_location",
+                      "expression": "`home_location`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "lat",
+                    "displayName": "lat"
+                  },
+                  "longitude": {
+                    "fieldName": "long",
+                    "displayName": "long"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "designator",
+                    "displayName": "designator"
+                  },
+                  {
+                    "fieldName": "home_location",
+                    "displayName": "home_location"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 6,
+            "width": 2,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}

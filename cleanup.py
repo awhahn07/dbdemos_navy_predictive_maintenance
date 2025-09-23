@@ -8,8 +8,21 @@
 
 # COMMAND ----------
 
-drop_schema = f"DROP SCHEMA IF EXISTS {catalog}.{db} CASCADE"
-spark.sql(drop_schema)
+dbutils.widgets.dropdown("reset_option", "reset_all_data", ["reset_all_data", "drop_tables_only", "drop_tables_and_pipeline"], "Reset Option")
+reset_option = dbutils.widgets.get("reset_option")
+
+# COMMAND ----------
+
+if reset_option == "reset_all_data":
+  drop_schema = f"DROP SCHEMA IF EXISTS {catalog}.{db} CASCADE"
+  spark.sql(drop_schema)
+  
+if reset_option == "drop_tables_only":  
+  tables = spark.sql(f"SHOW TABLES IN {catalog}.{db}").select("tableName").collect()
+  for table in tables:
+      drop_table = f"DROP TABLE IF EXISTS {catalog}.{db}.{table['tableName']}"
+      spark.sql(drop_table)
+
 
 # COMMAND ----------
 

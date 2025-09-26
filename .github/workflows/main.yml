@@ -40,7 +40,7 @@ jobs:
           # echo ${PROD_REPO_PATH}
           # echo ${DATABRICKS_HOST}
           echo "🔎 Updating ${PROD_REPO_PATH} to 'main'..."
-          if databricks repos update "${PROD_REPO_PATH}" --branch main; then
+          if databricks repos update --repo-id "${PROD_REPO_PATH}" --branch main; then
             echo "✅ Updated existing repo to latest 'main'."
           else
             echo "ℹ️ Repo not found; creating it..."

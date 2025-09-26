@@ -1,26 +1,26 @@
-# .github/workflows/promote-to-prod.yml
-name: Promote to Databricks Prod on PR merge
+name: Promote to Databricks Prod on push to main
 
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}  # lets you run it manually to test
 
 jobs:
   promote:
-    if: github.event.pull_request.merged == true
+    # If you want a guard, use a push-safe one like this (optional):
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # (Optional) use env-scoped secrets by targeting an environment:
+    # environment: prod
 
     env:
-      # GitHub repo URL used by Databricks Repos
       GIT_URL: https://github.com/${{ github.repository }}
-      PROD_REPO_PATH: ${{ secrets.PROD_REPO_PATH }}
-      # Databricks prod auth
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+      PROD_REPO_PATH: ${{ secrets.PROD_REPO_PATH }}
 
     steps:
-      - name: Check out (not strictly required, but handy for future steps)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install Databricks CLI
         run: |
@@ -37,11 +37,11 @@ jobs:
             exit 1
           fi
 
-          echo "🔎 Trying to update existing repo at ${PROD_REPO_PATH} to 'main'..."
+          echo "🔎 Updating ${PROD_REPO_PATH} to 'main'..."
           if databricks repos update --path "${PROD_REPO_PATH}" --branch main; then
-            echo "✅ Updated existing repo to the latest 'main'."
+            echo "✅ Updated existing repo to latest 'main'."
           else
-            echo "ℹ️ Repo not found at ${PROD_REPO_PATH}; creating it now..."
+            echo "ℹ️ Repo not found; creating it..."
             databricks repos create \
               --url "${GIT_URL}" \
               --provider gitHub \

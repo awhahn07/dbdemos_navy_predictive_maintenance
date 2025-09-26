@@ -1,0 +1,52 @@
+# .github/workflows/promote-to-prod.yml
+name: Promote to Databricks Prod on PR merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  promote:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    env:
+      # GitHub repo URL used by Databricks Repos
+      GIT_URL: https://github.com/${{ github.repository }}
+      PROD_REPO_PATH: ${{ secrets.PROD_REPO_PATH }}
+      # Databricks prod auth
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+
+    steps:
+      - name: Check out (not strictly required, but handy for future steps)
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install databricks-cli
+
+      - name: Ensure prod Repos folder exists and sync to latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${PROD_REPO_PATH:-}" ]]; then
+            echo "❌ PROD_REPO_PATH secret is not set."
+            exit 1
+          fi
+
+          echo "🔎 Trying to update existing repo at ${PROD_REPO_PATH} to 'main'..."
+          if databricks repos update --path "${PROD_REPO_PATH}" --branch main; then
+            echo "✅ Updated existing repo to the latest 'main'."
+          else
+            echo "ℹ️ Repo not found at ${PROD_REPO_PATH}; creating it now..."
+            databricks repos create \
+              --url "${GIT_URL}" \
+              --provider gitHub \
+              --path "${PROD_REPO_PATH}" \
+              --branch main
+            echo "✅ Created repo and checked out 'main'."
+          fi

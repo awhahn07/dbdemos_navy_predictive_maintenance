@@ -570,12 +570,6 @@ import pandas as pd
 file_location = "./platform_csvs/PdM_Platform_Data - navy_platform_data.csv"
 pandas_df = pd.read_csv(file_location)
 ships = spark.createDataFrame(pandas_df)
-# OLD CODE doesn't work with new csv file 
-# ships = spark.read.format("csv") \
-#   .option("inferSchema", "false") \
-#   .option("header", "true") \
-#   .option("sep", ",") \
-#   .load(file_location)
 ships = ships.withColumn("join_key", monotonically_increasing_id())
 
 # Get total number of ships for Turbine ID assignment

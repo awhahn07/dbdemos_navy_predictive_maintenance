@@ -37,15 +37,17 @@ jobs:
             exit 1
           fi
 
-          echo "🔎 Updating ${PROD_REPO_PATH} to 'main'..."
-          if databricks repos update --path "${PROD_REPO_PATH}" --branch main; then
-            echo "✅ Updated existing repo to latest 'main'."
-          else
-            echo "ℹ️ Repo not found; creating it..."
-            databricks repos create \
-              --url "${GIT_URL}" \
-              --provider gitHub \
-              --path "${PROD_REPO_PATH}" \
-              --branch main
-            echo "✅ Created repo and checked out 'main'."
-          fi
+          echo ${PROD_REPO_PATH}
+          echo ${DATABRICKS_HOST}
+          # echo "🔎 Updating ${PROD_REPO_PATH} to 'main'..."
+          # if databricks repos update --path "${PROD_REPO_PATH}" --branch main; then
+          #   echo "✅ Updated existing repo to latest 'main'."
+          # else
+          #   echo "ℹ️ Repo not found; creating it..."
+          #   databricks repos create \
+          #     --url "${GIT_URL}" \
+          #     --provider gitHub \
+          #     --path "${PROD_REPO_PATH}" \
+          #     --branch main
+          #   echo "✅ Created repo and checked out 'main'."
+          # fi

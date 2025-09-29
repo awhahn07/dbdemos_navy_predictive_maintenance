@@ -155,9 +155,12 @@ sensor_schema = StructType([
 ])
 
 data = [
-    ('sensor_B', 'Ships Force', True, 10.5),
-    ('sensor_D', 'Ships Force', True, 5.0),
-    ('sensor_F', 'Depot/I-Level', False, 24.0)
+    ('sensor_A', 'Ships Force', True, 8.0),    # Compressor related - moderate impact
+    ('sensor_B', 'Ships Force', True, 10.5),   # Existing - moderate impact  
+    ('sensor_C', 'Ships Force', True, 6.0),    # Cooling system - lower impact
+    ('sensor_D', 'Ships Force', True, 5.0),    # Existing - lower impact
+    ('sensor_E', 'Ships Force', True, 12.0),   # Fuel system - moderate impact
+    ('sensor_F', 'Depot/I-Level', False, 24.0) # Existing - high impact (turbine blades/vanes)
 ]
 
 df = spark.createDataFrame(data, sensor_schema)
@@ -172,170 +175,53 @@ elif data_exists==True and reset_all_data==False:
 
 # COMMAND ----------
 
-from mandrova.data_generator import SensorDataGenerator as sdg
-import numpy as np
-import pandas as pd
-import random
-import time
-import uuid
+# Import sensor data generation functionality
 import pyspark.sql.functions as F
 
+# COMMAND ----------
 
-def generate_sensor_data(turbine_id, sensor_conf, faulty = False, sample_size = 1000, display_graph = True, noise = 2, delta = -3):
-  dg = sdg()
-  rd = random.Random()
-  rd.seed(turbine_id)
-  dg.seed(turbine_id)
-  sigma = sensor_conf['sigma']
-  #Faulty, change the sigma with random value
-  if faulty:
-    sigma *= rd.randint(8,20)/10
-    
-  dg.generation_input.add_option(sensor_names="normal", distribution="normal", mu=0, sigma = sigma)
-  dg.generation_input.add_option(sensor_names="sin", eq=f"2*exp(sin(t))+{delta}", initial={"t":0}, step={"t":sensor_conf['sin_step']})
-  dg.generate(sample_size)
-  sensor_name = "sensor_"+ sensor_conf['name']
-  dg.sum(sensors=["normal", "sin"], save_to=sensor_name)
-  max_value = dg.data[sensor_name].max()
-  min_value = dg.data[sensor_name].min()
-  if faulty:
-    n_outliers = int(sample_size*0.15)
-    outliers = np.random.uniform(-max_value*rd.randint(2,3), max_value*rd.randint(2,3), n_outliers)
-    indicies = np.sort(np.random.randint(0, sample_size-1, n_outliers))
-    dg.inject(value=outliers, sensor=sensor_name, index=indicies)
-
-  n_outliers = int(sample_size*0.01)
-  outliers = np.random.uniform(min_value*noise, max_value*noise, n_outliers)
-  indicies = np.sort(np.random.randint(0, sample_size-1, n_outliers))
-  dg.inject(value=outliers, sensor=sensor_name, index=indicies)
-  
-  if display_graph:
-    dg.plot_data(sensors=[sensor_name])
-  return dg.data[sensor_name]
+# MAGIC %run ./sensor_data_generator
 
 # COMMAND ----------
 
-sensors = [{"name": "A", "sin_step": 0, "sigma": 1},
-           {"name": "B", "sin_step": 0, "sigma": 2},
-           {"name": "C", "sin_step": 0, "sigma": 3},
-           {"name": "D", "sin_step": 0.1, "sigma": 1.5},
-           {"name": "E", "sin_step": 0.01, "sigma": 2},
-           {"name": "F", "sin_step": 0.2, "sigma": 1}]
-current_time = int(time.time()) - 3600*30
+# Generate sensor data using the dedicated sensor data generator
+print("Starting sensor data generation...")
+print_generation_summary()
 
-#Sec between 2 metrics
-frequency_sec = 10
-#X points per turbine (1 point per frequency_sec second)
-sample_size = 2125
-turbine_count = 204
-dfs = []
+# Generate and save both historical and real-time sensor data
+historical_df, realtime_df = generate_and_save_all_sensor_data(spark, folder)
 
-# COMMAND ----------
+# Set folder references for downstream processing
+folder_sensor = folder + '/incoming_data'
+folder_historical = folder + '/historical_sensor_data'
 
-def generate_turbine_data(turbine):
-  rd = random.Random()
-  rd.seed(turbine)
-  damaged = turbine > turbine_count*0.7
-  if turbine % 10 == 0:
-    print(f"generating turbine {turbine} - damage: {damaged}")
-  df = pd.DataFrame()
-  damaged_sensors = []
-  rd.shuffle(sensors)
-
-  # Increase or decrease failure frequency here for realism, i.e. sensor_F lower frequency as higher impact failure
-  # 5% Sensor F failure
-  # 40% Sensor D Failure
-  # 55% Sensor B Fial
-  if damaged:
-    # 5% Fail Sensor F
-    if turbine % 20 == 0:
-      damaged_sensors.append('sensor_F')
-    # 33% Fail Sensor D
-    elif turbine % 3 == 0: 
-      damaged_sensors.append('sensor_D')
-    # 62% Fail Sensor B
-    else:
-      damaged_sensors.append('sensor_B')
-
-  for s in sensors:
-    #30% change to have 1 sensor being damaged
-    #Only 1 sensor can send damaged metrics at a time to simplify the model. A C and E won't be damaged for simplification
-    # ORIGINAL SENSOR GEN CODE
-    # if damaged and len(damaged_sensors) == 0 and s['name'] not in ["A", "C", "E"]:
-    #   damaged_sensor = rd.randint(1,10) > 5
-    # else:
-    #   damaged_sensor = False
-    # if damaged_sensor:
-    #   damaged_sensors.append('sensor_'+s['name'])
-    
-    # NEW SENSOR GEN CODE
-    if len(damaged_sensors) > 0 and s in damaged_sensors:
-      damaged_sensor = True
-    else:
-      damaged_sensor = False
-    plot = turbine == 0
-    df['sensor_'+s['name']] = generate_sensor_data(turbine, s, damaged_sensor, sample_size, plot)
-
-  dg = sdg()
-  #Damaged turbine will produce less
-  factor = 50 if damaged else 30
-  energy = dg.generation_input.add_option(sensor_names="energy", eq="x", initial={"x":0}, step={"x":np.absolute(np.random.randn(sample_size).cumsum()/factor)})
-  dg.generate(sample_size, seed=rd.uniform(0,10000))
-  #Add some null values in some timeseries to get expectation metrics
-  if damaged and rd.randint(0,9) >7:
-    n_nulls = int(sample_size*0.005)
-    indicies = np.sort(np.random.randint(0, sample_size-1, n_nulls))
-    dg.inject(value=None, sensor="energy", index=indicies)
-
-  if plot:
-    dg.plot_data()
-  df['energy'] = dg.data['energy']
-
-  df.insert(0, 'timestamp', range(current_time, current_time + len(df)*frequency_sec, frequency_sec))
-  df['turbine_id'] = str(uuid.UUID(int=rd.getrandbits(128)))
-  #df['damaged'] = damaged
-  df['abnormal_sensor'] = "ok" if len(damaged_sensors) == 0 else damaged_sensors[0]
-  return df
-
-from typing import Iterator
-import pandas as pd
-from pyspark.sql.functions import pandas_udf, col  
-
-df_schema=spark.createDataFrame(generate_turbine_data(0)) 
-
-def generate_turbine(iterator: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
-  for pdf in iterator:
-    for i, row in pdf.iterrows():
-      yield generate_turbine_data(row["id"])
-
-spark_df = spark.range(0, turbine_count).repartition(int(turbine_count/10)).mapInPandas(generate_turbine, schema=df_schema.schema)
-# spark_df = spark_df.cache()
-
-# COMMAND ----------
-
-
-folder_sensor = folder+'/incoming_data'
-spark_df.drop('damaged').drop('abnormal_sensor').orderBy('timestamp').repartition(100).write.mode('overwrite').format('parquet').save(folder_sensor)
-
-#Cleanup meta file to only keep names
-def cleanup(folder):
-  for f in dbutils.fs.ls(folder):
-    if not f.name.startswith('part-00'):
-      if not f.path.startswith('dbfs:/Volumes'):
-        raise Exception(f"unexpected path, {f} throwing exception for safety")
-      dbutils.fs.rm(f.path)
-      
-cleanup(folder_sensor)
+# Note: Cleanup is now handled automatically by the sensor_data_generator module
 
 # COMMAND ----------
 
 from faker import Faker
 from pyspark.sql.types import ArrayType, FloatType, StringType
 import pyspark.sql.functions as F
+import random
+import uuid
+import time
+import pandas as pd
+
+# Add cleanup function for backwards compatibility
+def cleanup(folder):
+  """Clean up folder by removing non-data files."""
+  for f in dbutils.fs.ls(folder):
+    if not f.name.startswith('part-00'):
+      if not f.path.startswith('dbfs:/Volumes'):
+        raise Exception(f"unexpected path, {f} throwing exception for safety")
+      dbutils.fs.rm(f.path)
 
 Faker.seed(0)
 faker = Faker()
 fake_latlng = F.udf(lambda: list(faker.local_latlng(country_code = 'US')), ArrayType(StringType()))
+
+# Set time variables for turbine metadata generation
+current_time = int(time.time()) - 3600*30
 
 # COMMAND ----------
 
@@ -460,14 +346,14 @@ part_categories = [{'name': 'Vane - Turbine'}, {'name': 'Blade - Turbine'}, {'na
 
 # list to check against high impact vs low impact
 high_impact_parts = ['Vane - Turbine', 'Blade - Turbine']
-sensors = [c for c in spark.read.parquet(folder_sensor).columns if "sensor" in c]
+sensors = get_sensor_columns(folder_sensor, spark)
 
-# TODO Can be changed if using more than sensors B, D, F
-low_impact_sensors = [s for s in sensors if s != 'sensor_F']
+# Get sensor categorization from the sensor data generator
+sensor_categories = get_sensor_impact_categories()
 
 parts = []
 for p in part_categories:
-  # Add a conditional in here to only assosciate high impact parts with sensor F failures
+  # Associate parts with appropriate sensors based on maintenance impact level
   nsn = faker.ean(length=8)
   for location in stock_data['stock_location']:
     part = {}
@@ -481,11 +367,10 @@ for p in part_categories:
     part['production_time'] = rd.randint(0, 5)
     #part['approvisioning_estimated_days'] = rd.randint(30,360)
     if p['name'] in high_impact_parts:
-      part['sensors'] = ['sensor_F']
+      part['sensors'] = sensor_categories['high_impact_sensors']
     else:
-      #part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,3))
-      # Parts only assigned to 1 sensor
-      part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,2))
+      # Parts can be associated with moderate or low impact sensors
+      part['sensors'] = random.sample(sensor_categories['all_non_high_impact'], rd.randint(1,2))
     parts.append(part)
 
 # Join synthetic parts data with stock locations
@@ -518,14 +403,14 @@ part_categories = [{'name': 'Vane - Turbine'}, {'name': 'Blade - Turbine'}, {'na
 
 # list to check against high impact vs low impact
 high_impact_parts = ['Vane - Turbine', 'Blade - Turbine']
-sensors = [c for c in spark.read.parquet(folder_sensor).columns if "sensor" in c]
+sensors = get_sensor_columns(folder_sensor, spark)
 
-# TODO Can be changed if using more than sensors B, D, F
-low_impact_sensors = [s for s in sensors if s != 'sensor_F']
+# Get sensor categorization from the sensor data generator
+sensor_categories = get_sensor_impact_categories()
 
 parts = []
 for p in part_categories:
-  # Add a conditional in here to only assosciate high impact parts with sensor F failures
+  # Associate parts with appropriate sensors based on maintenance impact level
   nsn = faker.ean(length=8)
   for location in stock_data['stock_location']:
     part = {}
@@ -539,11 +424,10 @@ for p in part_categories:
     part['production_time'] = rd.randint(0, 5)
     #part['approvisioning_estimated_days'] = rd.randint(30,360)
     if p['name'] in high_impact_parts:
-      part['sensors'] = ['sensor_F']
+      part['sensors'] = sensor_categories['high_impact_sensors']
     else:
-      #part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,3))
-      # Parts only assigned to 1 sensor
-      part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,2))
+      # Parts can be associated with moderate or low impact sensors
+      part['sensors'] = random.sample(sensor_categories['all_non_high_impact'], rd.randint(1,2))
     parts.append(part)
 
 # Join synthetic parts data with stock locations

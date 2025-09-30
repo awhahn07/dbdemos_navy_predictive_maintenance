@@ -20,7 +20,7 @@ dbutils.widgets.dropdown("sector", "pubsec", ["pubsec", "navy"], "Select Sector"
 
 catalog = "public_sector"
 # schema = dbName = db = "predictive_maintenance_pubsec"
-volume_name = "raw_landing"
+volume_name = "raw_landing_test"
 
 # COMMAND ----------
 
@@ -29,15 +29,19 @@ volume_name = "raw_landing"
 
 # COMMAND ----------
 
-
 demo_type = "navy"
+print(f"demo_type: {demo_type}")
 
 if demo_type == "pubsec":
   schema = dbName = db = "predictive_maintenance_pubsec"
 elif demo_type == "DoD":
   schema = dbName = db = "predictive_maintenance_DoD"
 elif demo_type == "navy":
-  schema = dbName = db = "predictive_maintenance_navy"
+  schema = dbName = db = "predictive_maintenance_navy_test"
+
+print(f"schema: {schema}")
+print(f"dbName: {dbName}")
+print(f"db: {db}")
 
 # COMMAND ----------
 
@@ -47,4 +51,7 @@ elif demo_type == "navy":
 # COMMAND ----------
 
 experiment_name = "pubsec_predictive_maintenance"
+print(f"experiment_name: {experiment_name}")
+
 model_name = "predictive_maintenance_model"
+print(f"model_name: {model_name}")

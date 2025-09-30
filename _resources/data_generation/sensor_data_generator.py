@@ -13,6 +13,20 @@
 
 # COMMAND ----------
 
+# MAGIC %run ../config
+
+# COMMAND ----------
+
+# MAGIC %run ./00-global-setup-v2
+
+# COMMAND ----------
+
+reset_all_data = False
+DBDemos.setup_schema(catalog, db, reset_all_data, volume_name)
+folder = f"/Volumes/{catalog}/{db}/{volume_name}"
+
+# COMMAND ----------
+
 # Required imports for sensor data generation
 from mandrova.data_generator import SensorDataGenerator as sdg
 import numpy as np
@@ -446,6 +460,67 @@ def print_generation_summary():
     for sensor, percentage in FAILURE_DISTRIBUTIONS.items():
         print(f"  {sensor}: {percentage}%")
     print("=" * 60)
+
+# COMMAND ----------
+
+historical_df, realtime_df = generate_and_save_all_sensor_data(spark, folder)
+
+# COMMAND ----------
+
+display(historical_df.limit(10))
+
+# COMMAND ----------
+
+display(realtime_df.limit(10))
+
+# COMMAND ----------
+
+historical_df.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.historical_sensor_data")
+realtime_df.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.realtime_sensor_data")
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC CREATE OR REPLACE TABLE historical_sensor_hourly AS
+# MAGIC SELECT turbine_id,
+# MAGIC       date_trunc('hour', from_unixtime(timestamp)) AS hourly_timestamp, 
+# MAGIC       avg(energy)          as avg_energy,
+# MAGIC       stddev_pop(sensor_A) as std_sensor_A,
+# MAGIC       stddev_pop(sensor_B) as std_sensor_B,
+# MAGIC       stddev_pop(sensor_C) as std_sensor_C,
+# MAGIC       stddev_pop(sensor_D) as std_sensor_D,
+# MAGIC       stddev_pop(sensor_E) as std_sensor_E,
+# MAGIC       stddev_pop(sensor_F) as std_sensor_F,
+# MAGIC       percentile_approx(sensor_A, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_A,
+# MAGIC       percentile_approx(sensor_B, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_B,
+# MAGIC       percentile_approx(sensor_C, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_C,
+# MAGIC       percentile_approx(sensor_D, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_D,
+# MAGIC       percentile_approx(sensor_E, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_E,
+# MAGIC       percentile_approx(sensor_F, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_F,
+# MAGIC       abnormal_sensor
+# MAGIC   FROM historical_sensor_data GROUP BY hourly_timestamp, turbine_id, abnormal_sensor
+
+# COMMAND ----------
+
+# MAGIC %sql 
+# MAGIC CREATE OR REPLACE TABLE realtime_sensor_hourly AS
+# MAGIC SELECT turbine_id,
+# MAGIC       date_trunc('hour', from_unixtime(timestamp)) AS hourly_timestamp, 
+# MAGIC       avg(energy)          as avg_energy,
+# MAGIC       stddev_pop(sensor_A) as std_sensor_A,
+# MAGIC       stddev_pop(sensor_B) as std_sensor_B,
+# MAGIC       stddev_pop(sensor_C) as std_sensor_C,
+# MAGIC       stddev_pop(sensor_D) as std_sensor_D,
+# MAGIC       stddev_pop(sensor_E) as std_sensor_E,
+# MAGIC       stddev_pop(sensor_F) as std_sensor_F,
+# MAGIC       percentile_approx(sensor_A, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_A,
+# MAGIC       percentile_approx(sensor_B, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_B,
+# MAGIC       percentile_approx(sensor_C, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_C,
+# MAGIC       percentile_approx(sensor_D, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_D,
+# MAGIC       percentile_approx(sensor_E, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_E,
+# MAGIC       percentile_approx(sensor_F, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_F,
+# MAGIC       abnormal_sensor
+# MAGIC   FROM realtime_sensor_data GROUP BY hourly_timestamp, turbine_id, abnormal_sensor
 
 # COMMAND ----------
 

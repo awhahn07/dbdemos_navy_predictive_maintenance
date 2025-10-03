@@ -127,32 +127,61 @@ except Exception as e:
 
 # COMMAND ----------
 
-# Field Eng West
-job_clusters = [
-  jobs.JobCluster.from_dict({
-    "job_cluster_key": "pubsec_predictive_maintenance",
-    "new_cluster": {
-      "spark_version": "15.1.x-cpu-ml-scala2.12",
-      "spark_conf": {
-        "spark.master": "local[*, 4]",
-        "spark.databricks.cluster.profile": "singleNode",
-        "spark.databricks.dataLineage.enabled": "true"
-      },
-      "custom_tags": {
-        "ResourceClass": "SingleNode",
-        "project": "dbdemos",
-        "demo": "lakehouse-navy-maintenance"
-      },
-      "spark_env_vars": {
-        "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
-      },
-      "instance_pool_id": "0727-104344-hauls13-pool-uftxk0r6",
-      "data_security_mode": "SINGLE_USER",
-      "runtime_engine": "STANDARD",
-      "num_workers": 0
-    }
-  }),
-]
+workspace_url = spark.conf.get("spark.databricks.workspaceUrl")
+workspace_name = workspace_url.split('.')[0]
+
+if workspace_name == 'e2-demo-field-eng':
+  # Field Eng West
+  job_clusters = [
+    jobs.JobCluster.from_dict({
+      "job_cluster_key": "pubsec_predictive_maintenance",
+      "new_cluster": {
+        "spark_version": "15.1.x-cpu-ml-scala2.12",
+        "spark_conf": {
+          "spark.master": "local[*, 4]",
+          "spark.databricks.cluster.profile": "singleNode",
+          "spark.databricks.dataLineage.enabled": "true"
+        },
+        "custom_tags": {
+          "ResourceClass": "SingleNode",
+          "project": "dbdemos",
+          "demo": "lakehouse-navy-maintenance"
+        },
+        "spark_env_vars": {
+          "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+        },
+        "instance_pool_id": "0727-104344-hauls13-pool-uftxk0r6",
+        "data_security_mode": "SINGLE_USER",
+        "runtime_engine": "STANDARD",
+        "num_workers": 0
+      }
+    }),
+  ]
+elif workspace_name == 'e2-demo-west':
+  # Field Eng Demo
+  job_clusters = [
+    jobs.JobCluster.from_dict({
+      "job_cluster_key": "pubsec_predictive_maintenance",
+      "new_cluster": {
+        "data_security_mode": "DATA_SECURITY_MODE_DEDICATED",
+        "policy_id": "E060384AFC00043E",
+        "kind": "CLASSIC_PREVIEW",
+        "spark_env_vars": {
+          "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+        },
+        "aws_attributes": {
+          "instance_profile_arn": "arn:aws:iam::997819012307:instance-profile/shard-demo-s3-access",
+          "availability": "SPOT_WITH_FALLBACK"
+        },
+        "runtime_engine": "STANDARD",
+        "spark_version": "16.4.x-scala2.12",
+        "node_type_id": "rd-fleet.xlarge",
+        "use_ml_runtime": True,
+        "is_single_node": False,
+        "num_workers": 8
+      }
+    }),
+  ]
 
 # COMMAND ----------
 

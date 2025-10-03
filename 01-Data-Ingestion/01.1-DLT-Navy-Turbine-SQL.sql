@@ -188,14 +188,14 @@ AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/historical_s
 -- COMMAND ----------
 
 -- DBTITLE 1,Ship metadata
-CREATE STREAMING TABLE ship_meta 
+CREATE OR REFRESH STREAMING TABLE ship_meta 
 COMMENT "Ship to turbine Meta_Data mapping"
 AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/meta_${demo}", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Parts and stock information
-CREATE STREAMING TABLE parts_bronze 
+CREATE OR REFRESH STREAMING TABLE parts_bronze 
 COMMENT "Turbine parts from our manufacturing system"
 AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/parts_${demo}", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
@@ -223,7 +223,7 @@ SELECT * EXCEPT(_rescued_data) FROM parts_bronze
 
 -- COMMAND ----------
 
-CREATE LIVE TABLE historical_sensor_silver (
+CREATE OR REFRESH MATERIALIZED VIEW historical_sensor_silver (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL)  ON VIOLATION DROP ROW,
   CONSTRAINT timestamp_valid EXPECT (hourly_timestamp IS not NULL)  ON VIOLATION DROP ROW
 )
@@ -249,7 +249,7 @@ SELECT turbine_id,
 
 -- COMMAND ----------
 
-CREATE LIVE TABLE sensor_silver (
+CREATE OR REFRESH MATERIALIZED VIEW sensor_silver (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL)  ON VIOLATION DROP ROW,
   CONSTRAINT timestamp_valid EXPECT (hourly_timestamp IS not NULL)  ON VIOLATION DROP ROW
 )
@@ -328,7 +328,7 @@ SELECT * FROM historical_sensor_silver
 
 -- COMMAND ----------
 
-CREATE LIVE TABLE current_status_predictions 
+CREATE OR REFRESH MATERIALIZED VIEW current_status_predictions 
 COMMENT "Navy gas turbine last status based on model prediction"
 AS
 WITH latest_metrics AS (
@@ -343,7 +343,7 @@ SELECT * EXCEPT(m.row_number),
 
 -- COMMAND ----------
 
-CREATE LIVE TABLE ship_current_status_gold AS
+CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold AS
 SELECT * EXCEPT(_rescued_data, m.fault) FROM current_status_predictions
 LEFT JOIN maintenance_actions m ON prediction = m.fault
 

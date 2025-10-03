@@ -37,7 +37,7 @@ if demo_type == "pubsec":
 elif demo_type == "DoD":
   schema = dbName = db = "predictive_maintenance_DoD"
 elif demo_type == "navy":
-  schema = dbName = db = "predictive_maintenance_navy_test"
+  schema = dbName = db = "predictive_maintenance_navy"
 
 print(f"schema: {schema}")
 print(f"dbName: {dbName}")

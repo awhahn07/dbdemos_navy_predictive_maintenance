@@ -103,11 +103,11 @@ try:
   dlt_pipeline = w.pipelines.create(
       name=dlt_name,
       libraries=library_list,
-      # clusters=clusters,
       serverless=True,
       target=db,
       development=True,
       catalog=catalog,
+      photon=True,
       configuration={
         "catalog": catalog,
         "db": db,
@@ -321,4 +321,4 @@ created_job = w.jobs.create(name=job_name,
 
 # COMMAND ----------
 
-run_by_id = w.jobs.run_now(job_id=created_job.job_id).result()
+# run_by_id = w.jobs.run_now(job_id=created_job.job_id).result()

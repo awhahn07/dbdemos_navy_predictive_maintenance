@@ -22,13 +22,26 @@ reset_all_data = dbutils.widgets.get("reset_all_data") == "true"
 DBDemos.setup_schema(catalog, db, reset_all_data, volume_name)
 folder = f"/Volumes/{catalog}/{db}/{volume_name}"
 
+# data_exists = False
+# try:
+#   #TODO update for new data versions
+#   dbutils.fs.ls(folder)
+#   dbutils.fs.ls(folder+"/historical_turbine_status")
+#   dbutils.fs.ls(folder+f"/parts_{demo_type}")
+#   dbutils.fs.ls(folder+"/turbine")
+#   dbutils.fs.ls(folder+"/incoming_data")
+#   dbutils.fs.ls(folder+f"/meta_{demo_type}")
+#   data_exists = True
+#   print("data already exists")
+# except Exception as e:
+#   print(f"folder doesn't exists, generating the data...")
+
 data_exists = False
 try:
   #TODO update for new data versions
   dbutils.fs.ls(folder)
-  dbutils.fs.ls(folder+"/historical_turbine_status")
+  dbutils.fs.ls(folder+"/historical_sensor_data")
   dbutils.fs.ls(folder+f"/parts_{demo_type}")
-  dbutils.fs.ls(folder+"/turbine")
   dbutils.fs.ls(folder+"/incoming_data")
   dbutils.fs.ls(folder+f"/meta_{demo_type}")
   data_exists = True
@@ -56,11 +69,10 @@ spark.sql(sql)
 
 git_profile = "awhahn07"
 git_repo = "dbdemos-fed-datasets"
-git_root_folder = "pdm_data"
+git_root_folder = "pdm_data_v2"
 
 data_folders = [
-  "historical_turbine_status",
-  "turbine",
+  "historical_sensor_data",
   "incoming_data",
   f"meta_{demo_type}",
   f"parts_{demo_type}"
@@ -68,24 +80,15 @@ data_folders = [
 
 def download_data(volume_folder, git_profile, git_repo, git_root_folder, data_folders):
   for folder in data_folders:
+    print(folder)
     DBDemos.download_file_from_git(volume_folder+'/'+folder, git_profile, git_repo, '/'+git_root_folder+'/'+folder)
 
 data_downloaded = False
 
-###TODO Remove in Prod 
-
-reset_all_data = True
-
 if not data_exists:
   if not reset_all_data:
     try:
-      # TODO Update git data sources
-      download_data(folder, git_profile, git_repo, git_root_folder, data_folders)
-        # DBDemos.download_file_from_git(folder+'/historical_turbine_status', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/historical_turbine_status")
-        # DBDemos.download_file_from_git(folder+'/turbine', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/turbine")
-        # DBDemos.download_file_from_git(folder+'/incoming_data', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/incoming_data")
-        # DBDemos.download_file_from_git(folder+f'/meta_{demo_type}', "awhahn07", "dbdemos-fed-datasets", f"/new_pdm_data/meta_{demo_type}")
-        # DBDemos.download_file_from_git(folder+f'/parts_{demo_type}', "awhahn07", "dbdemos-fed-datasets", f"/new_pdm_data/parts_{demo_type})")    
+      download_data(folder, git_profile, git_repo, git_root_folder, data_folders)  
       data_downloaded = True
     except Exception as e: 
         print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")    
@@ -143,13 +146,6 @@ except Exception as e:
 
 # COMMAND ----------
 
-if data_downloaded:
-    dbutils.notebook.exit(f"Data Downloaded to {folder}")
-elif data_exists==True and reset_all_data==False: 
-    dbutils.notebook.exit(f"Data Downloaded to {folder}")
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Generate Data if necessary
 
@@ -180,6 +176,13 @@ data = [
 
 df = spark.createDataFrame(data, sensor_schema)
 df.write.mode("overwrite").saveAsTable("sensor_maintenance")
+
+# COMMAND ----------
+
+if data_downloaded:
+    dbutils.notebook.exit(f"Data Downloaded to {folder}")
+elif data_exists==True and reset_all_data==False: 
+    dbutils.notebook.exit(f"Data Downloaded to {folder}")
 
 # COMMAND ----------
 

@@ -20,7 +20,7 @@ dbutils.widgets.dropdown("sector", "pubsec", ["pubsec", "navy"], "Select Sector"
 
 catalog = "public_sector"
 # schema = dbName = db = "predictive_maintenance_pubsec"
-volume_name = "raw_landing_test"
+volume_name = "raw_landing"
 
 # COMMAND ----------
 

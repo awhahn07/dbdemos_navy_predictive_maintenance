@@ -215,9 +215,9 @@ def transport_optimization(pdf: pd.DataFrame) -> pd.DataFrame:
 # COMMAND ----------
 
 # Test the function
-product_selection = "Seal"
-pdf = lp_table.filter(f.col("type")==product_selection).toPandas()
-transport_optimization(pdf)
+# product_selection = "Seal"
+# pdf = lp_table.filter(f.col("type")==product_selection).toPandas()
+# transport_optimization(pdf)
 
 # COMMAND ----------
 
@@ -243,7 +243,7 @@ display(optimal_transport_df.filter(optimal_transport_df['qty_shipped'] > 0))
 
 # COMMAND ----------
 
-parts = spark.read.table(f"{catalog}.{db}.parts").select('stock_location', 'stock_location_id').distinct()
+parts = spark.read.table(f"{catalog}.{db}.parts_silver").select('stock_location', 'stock_location_id').distinct()
 designators = spark.read.table(f"{catalog}.{db}.ship_meta").select('designator').distinct().withColumn('designator_id', f.abs(f.hash('designator')))
 
 # rejoin actual designator and stock location values to the unique IDs

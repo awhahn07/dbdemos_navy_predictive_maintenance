@@ -26,11 +26,11 @@ spark.sql(
     """
 )
 
-spark.sql(
-    f"""
-    CREATE OR REPLACE TABLE {catalog}.{db}.sensor_bronze_ml AS SELECT * FROM {catalog}.{db}.sensor_bronze;
-    """
-)
+# spark.sql(
+#     f"""
+#     CREATE OR REPLACE TABLE {catalog}.{db}.sensor_bronze_ml AS SELECT * FROM {catalog}.{db}.sensor_bronze;
+#     """
+# )
 
 # COMMAND ----------
 

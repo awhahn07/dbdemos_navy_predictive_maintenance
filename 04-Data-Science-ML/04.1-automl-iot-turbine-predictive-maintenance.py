@@ -97,12 +97,7 @@
 
 # COMMAND ----------
 
-# MAGIC %run ../config
-
-# COMMAND ----------
-
-spark.sql(f"USE CATALOG {catalog}")
-spark.sql(f"USE SCHEMA {db}")
+# MAGIC %run ../_resources/00-setup $reset_all_data=False 
 
 # COMMAND ----------
 

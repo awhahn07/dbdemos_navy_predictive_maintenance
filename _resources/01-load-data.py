@@ -22,13 +22,26 @@ reset_all_data = dbutils.widgets.get("reset_all_data") == "true"
 DBDemos.setup_schema(catalog, db, reset_all_data, volume_name)
 folder = f"/Volumes/{catalog}/{db}/{volume_name}"
 
+# data_exists = False
+# try:
+#   #TODO update for new data versions
+#   dbutils.fs.ls(folder)
+#   dbutils.fs.ls(folder+"/historical_turbine_status")
+#   dbutils.fs.ls(folder+f"/parts_{demo_type}")
+#   dbutils.fs.ls(folder+"/turbine")
+#   dbutils.fs.ls(folder+"/incoming_data")
+#   dbutils.fs.ls(folder+f"/meta_{demo_type}")
+#   data_exists = True
+#   print("data already exists")
+# except Exception as e:
+#   print(f"folder doesn't exists, generating the data...")
+
 data_exists = False
 try:
   #TODO update for new data versions
   dbutils.fs.ls(folder)
-  dbutils.fs.ls(folder+"/historical_turbine_status")
+  dbutils.fs.ls(folder+"/historical_sensor_data")
   dbutils.fs.ls(folder+f"/parts_{demo_type}")
-  dbutils.fs.ls(folder+"/turbine")
   dbutils.fs.ls(folder+"/incoming_data")
   dbutils.fs.ls(folder+f"/meta_{demo_type}")
   data_exists = True
@@ -56,11 +69,10 @@ spark.sql(sql)
 
 git_profile = "awhahn07"
 git_repo = "dbdemos-fed-datasets"
-git_root_folder = "pdm_data"
+git_root_folder = "pdm_data_v2"
 
 data_folders = [
-  "historical_turbine_status",
-  "turbine",
+  "historical_sensor_data",
   "incoming_data",
   f"meta_{demo_type}",
   f"parts_{demo_type}"
@@ -68,6 +80,7 @@ data_folders = [
 
 def download_data(volume_folder, git_profile, git_repo, git_root_folder, data_folders):
   for folder in data_folders:
+    print(folder)
     DBDemos.download_file_from_git(volume_folder+'/'+folder, git_profile, git_repo, '/'+git_root_folder+'/'+folder)
 
 data_downloaded = False
@@ -75,17 +88,10 @@ data_downloaded = False
 if not data_exists:
   if not reset_all_data:
     try:
-      # TODO Update git data sources
-      download_data(folder, git_profile, git_repo, git_root_folder, data_folders)
-        # DBDemos.download_file_from_git(folder+'/historical_turbine_status', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/historical_turbine_status")
-        # DBDemos.download_file_from_git(folder+'/turbine', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/turbine")
-        # DBDemos.download_file_from_git(folder+'/incoming_data', "awhahn07", "dbdemos-fed-datasets", "/new_pdm_data/incoming_data")
-        # DBDemos.download_file_from_git(folder+f'/meta_{demo_type}', "awhahn07", "dbdemos-fed-datasets", f"/new_pdm_data/meta_{demo_type}")
-        # DBDemos.download_file_from_git(folder+f'/parts_{demo_type}', "awhahn07", "dbdemos-fed-datasets", f"/new_pdm_data/parts_{demo_type})")    
+      download_data(folder, git_profile, git_repo, git_root_folder, data_folders)  
       data_downloaded = True
     except Exception as e: 
-        print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")     
-
+        print(f"Error trying to download the file from the repo: {str(e)}. Will generate the data instead...")    
 
 # COMMAND ----------
 
@@ -123,7 +129,7 @@ except Exception as e:
         churn_model = MaintenanceEmptyModel()
         import pandas as pd
         
-        signature = ModelSignature.from_dict({'inputs': '[{"name": "hourly_timestamp", "type": "datetime"}, {"name": "avg_energy", "type": "double"}, {"name": "std_sensor_A", "type": "double"}, {"name": "std_sensor_B", "type": "double"}, {"name": "std_sensor_C", "type": "double"}, {"name": "std_sensor_D", "type": "double"}, {"name": "std_sensor_E", "type": "double"}, {"name": "std_sensor_F", "type": "double"}, {"name": "percentiles_sensor_A", "type": "string"}, {"name": "percentiles_sensor_B", "type": "string"}, {"name": "percentiles_sensor_C", "type": "string"}, {"name": "percentiles_sensor_D", "type": "string"}, {"name": "percentiles_sensor_E", "type": "string"}, {"name": "percentiles_sensor_F", "type": "string"}, {"name": "location", "type": "string"}, {"name": "model", "type": "string"}, {"name": "state", "type": "string"}]','outputs': '[{"type": "tensor", "tensor-spec": {"dtype": "object", "shape": [-1]}}]'})
+        signature = ModelSignature.from_dict({'inputs': '[{"name": "hourly_timestamp", "type": "datetime"}, {"name": "avg_energy", "type": "double"}, {"name": "std_sensor_A", "type": "double"}, {"name": "std_sensor_B", "type": "double"}, {"name": "std_sensor_C", "type": "double"}, {"name": "std_sensor_D", "type": "double"}, {"name": "std_sensor_E", "type": "double"}, {"name": "std_sensor_F", "type": "double"}, {"name": "percentiles_sensor_A", "type": "string"}, {"name": "percentiles_sensor_B", "type": "string"}, {"name": "percentiles_sensor_C", "type": "string"}, {"name": "percentiles_sensor_D", "type": "string"}, {"name": "percentiles_sensor_E", "type": "string"}, {"name": "percentiles_sensor_F", "type": "string"}]','outputs': '[{"type": "tensor", "tensor-spec": {"dtype": "object", "shape": [-1]}}]'})
         
         with mlflow.start_run(run_name="mockup_model") as run, mock.patch("mlflow.utils.environment.PYTHON_VERSION", DBDemos.get_python_version_mlflow()):
             model_info = mlflow.pyfunc.log_model(artifact_path="model", python_model=churn_model, signature=signature, pip_requirements=['mlflow=='+mlflow.__version__, 'pandas=='+pd.__version__, 'numpy=='+np.__version__, 'cloudpickle=='+cloudpickle.__version__])
@@ -137,6 +143,11 @@ except Exception as e:
         # print(f"ERROR: couldn't access model for unknown reason - DLT pipeline will likely fail as model isn't available: {e}")
 
 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Generate Data if necessary
 
 # COMMAND ----------
 
@@ -155,9 +166,12 @@ sensor_schema = StructType([
 ])
 
 data = [
-    ('sensor_B', 'Ships Force', True, 10.5),
-    ('sensor_D', 'Ships Force', True, 5.0),
-    ('sensor_F', 'Depot/I-Level', False, 24.0)
+    ('sensor_A', 'Intermediate Level', True, 8.0),    # Compressor related - moderate impact
+    ('sensor_B', 'Intermediate Level', True, 10.5),   # Existing - moderate impact  
+    ('sensor_C', 'Organizational Level', True, 6.0),    # Cooling system - lower impact
+    ('sensor_D', 'Organizational Level', True, 5.0),    # Existing - lower impact
+    ('sensor_E', 'Intermediate Level', True, 12.0),   # Fuel system - moderate impact
+    ('sensor_F', 'Depot Level', False, 24.0) # Existing - high impact (turbine blades/vanes)
 ]
 
 df = spark.createDataFrame(data, sensor_schema)
@@ -172,208 +186,119 @@ elif data_exists==True and reset_all_data==False:
 
 # COMMAND ----------
 
-from mandrova.data_generator import SensorDataGenerator as sdg
-import numpy as np
-import pandas as pd
-import random
-import time
-import uuid
-import pyspark.sql.functions as F
+# MAGIC %md
+# MAGIC Exit notebook if download successful
 
+# COMMAND ----------
 
-def generate_sensor_data(turbine_id, sensor_conf, faulty = False, sample_size = 1000, display_graph = True, noise = 2, delta = -3):
-  dg = sdg()
-  rd = random.Random()
-  rd.seed(turbine_id)
-  dg.seed(turbine_id)
-  sigma = sensor_conf['sigma']
-  #Faulty, change the sigma with random value
-  if faulty:
-    sigma *= rd.randint(8,20)/10
+def cleanup_folder(folder_path):
+    """
+    Clean up folder by removing non-data files.
     
-  dg.generation_input.add_option(sensor_names="normal", distribution="normal", mu=0, sigma = sigma)
-  dg.generation_input.add_option(sensor_names="sin", eq=f"2*exp(sin(t))+{delta}", initial={"t":0}, step={"t":sensor_conf['sin_step']})
-  dg.generate(sample_size)
-  sensor_name = "sensor_"+ sensor_conf['name']
-  dg.sum(sensors=["normal", "sin"], save_to=sensor_name)
-  max_value = dg.data[sensor_name].max()
-  min_value = dg.data[sensor_name].min()
-  if faulty:
-    n_outliers = int(sample_size*0.15)
-    outliers = np.random.uniform(-max_value*rd.randint(2,3), max_value*rd.randint(2,3), n_outliers)
-    indicies = np.sort(np.random.randint(0, sample_size-1, n_outliers))
-    dg.inject(value=outliers, sensor=sensor_name, index=indicies)
+    Args:
+        folder_path: Path to folder to clean
+    """
+    for f in dbutils.fs.ls(folder_path):
+        if not f.name.startswith('part-00'):
+            if not f.path.startswith('dbfs:/Volumes'):
+                raise Exception(f"unexpected path, {f} throwing exception for safety")
+            dbutils.fs.rm(f.path)
 
-  n_outliers = int(sample_size*0.01)
-  outliers = np.random.uniform(min_value*noise, max_value*noise, n_outliers)
-  indicies = np.sort(np.random.randint(0, sample_size-1, n_outliers))
-  dg.inject(value=outliers, sensor=sensor_name, index=indicies)
-  
-  if display_graph:
-    dg.plot_data(sensors=[sensor_name])
-  return dg.data[sensor_name]
-
-# COMMAND ----------
-
-sensors = [{"name": "A", "sin_step": 0, "sigma": 1},
-           {"name": "B", "sin_step": 0, "sigma": 2},
-           {"name": "C", "sin_step": 0, "sigma": 3},
-           {"name": "D", "sin_step": 0.1, "sigma": 1.5},
-           {"name": "E", "sin_step": 0.01, "sigma": 2},
-           {"name": "F", "sin_step": 0.2, "sigma": 1}]
-current_time = int(time.time()) - 3600*30
-
-#Sec between 2 metrics
-frequency_sec = 10
-#X points per turbine (1 point per frequency_sec second)
-sample_size = 2125
-turbine_count = 204
-dfs = []
-
-# COMMAND ----------
-
-def generate_turbine_data(turbine):
-  rd = random.Random()
-  rd.seed(turbine)
-  damaged = turbine > turbine_count*0.7
-  if turbine % 10 == 0:
-    print(f"generating turbine {turbine} - damage: {damaged}")
-  df = pd.DataFrame()
-  damaged_sensors = []
-  rd.shuffle(sensors)
-
-  # Increase or decrease failure frequency here for realism, i.e. sensor_F lower frequency as higher impact failure
-  # 5% Sensor F failure
-  # 40% Sensor D Failure
-  # 55% Sensor B Fial
-  if damaged:
-    # 5% Fail Sensor F
-    if turbine % 20 == 0:
-      damaged_sensors.append('sensor_F')
-    # 33% Fail Sensor D
-    elif turbine % 3 == 0: 
-      damaged_sensors.append('sensor_D')
-    # 62% Fail Sensor B
-    else:
-      damaged_sensors.append('sensor_B')
-
-  for s in sensors:
-    #30% change to have 1 sensor being damaged
-    #Only 1 sensor can send damaged metrics at a time to simplify the model. A C and E won't be damaged for simplification
-    # ORIGINAL SENSOR GEN CODE
-    # if damaged and len(damaged_sensors) == 0 and s['name'] not in ["A", "C", "E"]:
-    #   damaged_sensor = rd.randint(1,10) > 5
-    # else:
-    #   damaged_sensor = False
-    # if damaged_sensor:
-    #   damaged_sensors.append('sensor_'+s['name'])
+def save_sensor_data(spark_df, folder_path, partitions=100, cleanup=True, timestamp=False):
+    """
+    Save data to parquet format with cleanup.
     
-    # NEW SENSOR GEN CODE
-    if len(damaged_sensors) > 0 and s in damaged_sensors:
-      damaged_sensor = True
+    Args:
+        spark_df: Spark DataFrame to save
+        folder_path: Destination folder path
+        partitions: Number of partitions for output
+        cleanup: Whether to cleanup metadata files
+        timestamp: Whether data is timestamped, order by timestamp
+    """
+    if timestamp:
+        spark_df.orderBy('timestamp').repartition(partitions).write.mode('overwrite').format('parquet').save(folder_path)
     else:
-      damaged_sensor = False
-    plot = turbine == 0
-    df['sensor_'+s['name']] = generate_sensor_data(turbine, s, damaged_sensor, sample_size, plot)
+        spark_df.repartition(partitions).write.mode('overwrite').format('parquet').save(folder_path)
 
-  dg = sdg()
-  #Damaged turbine will produce less
-  factor = 50 if damaged else 30
-  energy = dg.generation_input.add_option(sensor_names="energy", eq="x", initial={"x":0}, step={"x":np.absolute(np.random.randn(sample_size).cumsum()/factor)})
-  dg.generate(sample_size, seed=rd.uniform(0,10000))
-  #Add some null values in some timeseries to get expectation metrics
-  if damaged and rd.randint(0,9) >7:
-    n_nulls = int(sample_size*0.005)
-    indicies = np.sort(np.random.randint(0, sample_size-1, n_nulls))
-    dg.inject(value=None, sensor="energy", index=indicies)
-
-  if plot:
-    dg.plot_data()
-  df['energy'] = dg.data['energy']
-
-  df.insert(0, 'timestamp', range(current_time, current_time + len(df)*frequency_sec, frequency_sec))
-  df['turbine_id'] = str(uuid.UUID(int=rd.getrandbits(128)))
-  #df['damaged'] = damaged
-  df['abnormal_sensor'] = "ok" if len(damaged_sensors) == 0 else damaged_sensors[0]
-  return df
-
-from typing import Iterator
-import pandas as pd
-from pyspark.sql.functions import pandas_udf, col  
-
-df_schema=spark.createDataFrame(generate_turbine_data(0)) 
-
-def generate_turbine(iterator: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
-  for pdf in iterator:
-    for i, row in pdf.iterrows():
-      yield generate_turbine_data(row["id"])
-
-spark_df = spark.range(0, turbine_count).repartition(int(turbine_count/10)).mapInPandas(generate_turbine, schema=df_schema.schema)
-# spark_df = spark_df.cache()
+    if cleanup:
+        cleanup_folder(folder_path)
 
 # COMMAND ----------
 
-
-folder_sensor = folder+'/incoming_data'
-spark_df.drop('damaged').drop('abnormal_sensor').orderBy('timestamp').repartition(100).write.mode('overwrite').format('parquet').save(folder_sensor)
-
-#Cleanup meta file to only keep names
-def cleanup(folder):
-  for f in dbutils.fs.ls(folder):
-    if not f.name.startswith('part-00'):
-      if not f.path.startswith('dbfs:/Volumes'):
-        raise Exception(f"unexpected path, {f} throwing exception for safety")
-      dbutils.fs.rm(f.path)
-      
-cleanup(folder_sensor)
+from data_generation import *
 
 # COMMAND ----------
 
-from faker import Faker
-from pyspark.sql.types import ArrayType, FloatType, StringType
-import pyspark.sql.functions as F
+from pathlib import Path
 
-Faker.seed(0)
-faker = Faker()
-fake_latlng = F.udf(lambda: list(faker.local_latlng(country_code = 'US')), ArrayType(StringType()))
+BASE_CSV_PATH = Path("./platform_csvs")
+PUBSEC_PLATFORM_DATA = BASE_CSV_PATH / "PdM_Platform_Data - pubsec_platform_data.csv"
+NAVY_PLATFORM_DATA = BASE_CSV_PATH / "PdM_Platform_Data - navy_platform_data.csv"
+
+if demo_type == 'navy':
+  path = NAVY_PLATFORM_DATA
+elif demo_type == 'pubsec':
+  path = PUBSEC_PLATFORM_DATA
+else:
+  raise Exception("Invalid demo type")
+
+platform_meta = get_platform_meta(spark, path=path)
+
 
 # COMMAND ----------
 
-rd = random.Random()
-rd.seed(0)
-folder_turbine = folder+'/turbine'
-(spark_df.select('turbine_id').drop_duplicates()
-   .withColumn('fake_lat_long', fake_latlng())
-   .withColumn('model', F.lit('LM2500'))
-   .withColumn('lat', F.col('fake_lat_long').getItem(0))
-   .withColumn('long', F.col('fake_lat_long').getItem(1))
-   .withColumn('location', F.col('fake_lat_long').getItem(2))
-   .withColumn('country', F.col('fake_lat_long').getItem(3))
-   .withColumn('state', F.col('fake_lat_long').getItem(4))
-   .drop('fake_lat_long')
- .orderBy(F.rand()).repartition(1).write.mode('overwrite').format('json').save(folder_turbine))
+# Generate sensor data using the dedicated sensor data generator
+print("Starting sensor data generation...")
+print_generation_summary()
 
-#Add some turbine with wrong data for expectations
-# TODO Update for realistic data quality metrics
-fake_null_uuid = F.udf(lambda: None if rd.randint(0,9) > 2 else str(uuid.uuid4()))
-df_error = (spark_df.select('turbine_id').limit(30)
-   .withColumn('turbine_id', fake_null_uuid())
-   .withColumn('fake_lat_long', fake_latlng())
-   .withColumn('model', F.lit('LM2500'))
-   .withColumn('lat', F.lit("ERROR"))
-   .withColumn('long', F.lit("ERROR"))
-   .withColumn('location', F.col('fake_lat_long').getItem(2))
-   .withColumn('country', F.col('fake_lat_long').getItem(3))
-   .withColumn('state', F.col('fake_lat_long').getItem(4))
-   .drop('fake_lat_long').repartition(1).write.mode('append').format('json').save(folder_turbine))
-cleanup(folder_turbine)
+base_folder = folder
+TURBINE_PER_PLATFORM = 4
+REALTIME_TURBINE_COUNT = TURBINE_PER_PLATFORM * platform_meta.select('designator').distinct().count()
 
-folder_status = folder+'/historical_turbine_status'
-(spark_df.select('turbine_id', 'abnormal_sensor').drop_duplicates()
-         .withColumn('start_time', (F.lit(current_time-1000)-F.rand()*2000).cast('int'))
-         .withColumn('end_time', (F.lit(current_time+3600*24*30)+F.rand()*4000).cast('int'))
-         .repartition(1).write.mode('overwrite').format('json').save(folder_status))
-cleanup(folder_status)
+# Generate historical data
+print("Generating historical sensor data...")
+historical_df = generate_historical_sensor_data(spark)
+folder_historical = base_folder + '/historical_sensor_data'
+save_sensor_data(historical_df, folder_historical, partitions=100)
+print(f"Historical data saved to: {folder_historical}")
+
+# Generate real-time data  
+print("Generating real-time sensor data...")
+realtime_df = generate_realtime_sensor_data(spark, turbine_count=REALTIME_TURBINE_COUNT)
+folder_realtime = base_folder + '/incoming_data'
+# Drop 'damaged' column for production pipeline (keep abnormal_sensor for validation)
+realtime_df_clean = realtime_df.drop('damaged') if 'damaged' in realtime_df.columns else realtime_df
+save_sensor_data(realtime_df_clean, folder_realtime, partitions=20)
+print(f"Real-time data saved to: {folder_realtime}")
+
+# # Set folder references for downstream processing
+# folder_sensor = folder + '/incoming_data'
+# folder_historical = folder + '/historical_sensor_data'
+
+# Note: Cleanup is now handled automatically by the sensor_data_generator module
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Assign RealTime Turbine IDs to Platforms
+
+# COMMAND ----------
+
+turbine_ids = realtime_df.select('turbine_id').distinct()
+platform_count = platform_meta.select('designator').distinct().count()
+
+platform_meta = map_platform_to_turbine(
+  platform_meta=platform_meta.repartition(1),
+  turbine_ids=turbine_ids.repartition(1),
+  platform_count=platform_count
+  )
+
+save_sensor_data(platform_meta, folder+f"/meta_{demo_type}", partitions=5, cleanup=True, timestamp=False)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Generate Inventory Data
 
 # COMMAND ----------
 
@@ -450,56 +375,68 @@ cleanup(folder_status)
 
 # COMMAND ----------
 
-# Read in the stock location data from local csv
-stock_data = pd.read_csv('./platform_csvs/PdM_Platform_Data - navy_stock_location_data.csv')
+if demo_type == 'navy':
+  path = './platform_csvs/PdM_Platform_Data - navy_stock_location_data.csv'
+elif demo_type == 'pubsec':
+  path = './platform_csvs/PdM_Platform_Data - pubsec_stock_location_data.csv'
+else:
+  raise Exception("Invalid demo type")
 
-#For each supply location, we'll generate supply chain parts
-# Low failure items + high failure items
+parts_meta, inventory = get_parts_and_stock(spark, path)
 
-part_categories = [{'name': 'Vane - Turbine'}, {'name': 'Blade - Turbine'}, {'name': 'Fuel Nozzle'}, {'name': 'Seal'}, {'name': 'controller card #1 - ECU'}, {'name': 'controller card #2 - ECU'}, {'name': 'Pump - Fuel'}, {'name': 'Filter - Fuel / Oil'}, {'name': 'Valve - Fuel / Oil'}]
+folder_parts = folder+f'/parts_{demo_type}'
+save_sensor_data(inventory, folder_parts)
 
-# list to check against high impact vs low impact
-high_impact_parts = ['Vane - Turbine', 'Blade - Turbine']
-sensors = [c for c in spark.read.parquet(folder_sensor).columns if "sensor" in c]
-
-# TODO Can be changed if using more than sensors B, D, F
-low_impact_sensors = [s for s in sensors if s != 'sensor_F']
-
-parts = []
-for p in part_categories:
-  # Add a conditional in here to only assosciate high impact parts with sensor F failures
-  nsn = faker.ean(length=8)
-  for location in stock_data['stock_location']:
-    part = {}
-    part['NSN'] = nsn
-    part['type'] = p['name']
-    part['width'] = rd.randint(100,2000)
-    part['height'] = rd.randint(100,2000)
-    part['weight'] = rd.randint(100,20000)
-    part['stock_available'] = rd.randint(0, 10)
-    part['stock_location'] =  location
-    part['production_time'] = rd.randint(0, 5)
-    #part['approvisioning_estimated_days'] = rd.randint(30,360)
-    if p['name'] in high_impact_parts:
-      part['sensors'] = ['sensor_F']
-    else:
-      #part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,3))
-      # Parts only assigned to 1 sensor
-      part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,2))
-    parts.append(part)
-
-# Join synthetic parts data with stock locations
-pubsec_stock_joined = pd.DataFrame(parts).merge(stock_data, on='stock_location', suffixes=('', '_pubsec'))
-
-# Create spark df, write to volume 
-df = spark.createDataFrame(pubsec_stock_joined)
-folder_parts = folder+'/parts_navy'
-df.write.mode('overwrite').format('json').save(folder_parts)
-cleanup(folder_parts)
+parts_meta.write.mode("overwrite").saveAsTable(f"parts_meta")
 
 # COMMAND ----------
 
-display(pubsec_stock_joined)
+# # Read in the stock location data from local csv
+# stock_data = pd.read_csv('./platform_csvs/PdM_Platform_Data - navy_stock_location_data.csv')
+
+# #For each supply location, we'll generate supply chain parts
+# # Low failure items + high failure items
+
+# part_categories = [{'name': 'Vane - Turbine'}, {'name': 'Blade - Turbine'}, {'name': 'Fuel Nozzle'}, {'name': 'Seal'}, {'name': 'controller card #1 - ECU'}, {'name': 'controller card #2 - ECU'}, {'name': 'Pump - Fuel'}, {'name': 'Filter - Fuel / Oil'}, {'name': 'Valve - Fuel / Oil'}]
+
+# # list to check against high impact vs low impact
+# high_impact_parts = ['Vane - Turbine', 'Blade - Turbine']
+# #sensors = get_sensor_columns(folder_sensor, spark)
+
+# # Get sensor categorization from the sensor data generator
+# sensor_categories = get_sensor_impact_categories()
+
+# parts = []
+# for p in part_categories:
+#   # Associate parts with appropriate sensors based on maintenance impact level
+#   nsn = faker.ean(length=8)
+#   for location in stock_data['stock_location']:
+#     part = {}
+#     part['NSN'] = nsn
+#     part['type'] = p['name']
+#     part['width'] = rd.randint(100,2000)
+#     part['height'] = rd.randint(100,2000)
+#     part['weight'] = rd.randint(100,20000)
+#     part['stock_available'] = rd.randint(0, 10)
+#     part['stock_location'] =  location
+#     part['production_time'] = rd.randint(0, 5)
+#     #part['approvisioning_estimated_days'] = rd.randint(30,360)
+#     if p['name'] in high_impact_parts:
+#       part['sensors'] = sensor_categories['high_impact_sensors']
+#     else:
+#       # Parts can be associated with moderate or low impact sensors
+#       part['sensors'] = random.sample(sensor_categories['all_non_high_impact'], rd.randint(1,2))
+#     parts.append(part)
+
+# # Join synthetic parts data with stock locations
+# pubsec_stock_joined = pd.DataFrame(parts).merge(stock_data, on='stock_location', suffixes=('', '_pubsec'))
+
+# # Create spark df, write to volume 
+# df = spark.createDataFrame(pubsec_stock_joined)
+
+
+# # df.write.mode('overwrite').format('json').save(folder_parts)
+# # cleanup(folder_parts)
 
 # COMMAND ----------
 
@@ -508,52 +445,54 @@ display(pubsec_stock_joined)
 
 # COMMAND ----------
 
-# Read in the stock location data from local csv
-stock_data = pd.read_csv('./platform_csvs/PdM_Platform_Data - pubsec_stock_location_data.csv')
+# # Read in the stock location data from local csv
+# stock_data = pd.read_csv('./platform_csvs/PdM_Platform_Data - pubsec_stock_location_data.csv')
 
-#For each supply location, we'll generate supply chain parts
-# Low failure items + high failure items
+# #For each supply location, we'll generate supply chain parts
+# # Low failure items + high failure items
 
-part_categories = [{'name': 'Vane - Turbine'}, {'name': 'Blade - Turbine'}, {'name': 'Fuel Nozzle'}, {'name': 'Seal'}, {'name': 'controller card #1 - ECU'}, {'name': 'controller card #2 - ECU'}, {'name': 'Pump - Fuel'}, {'name': 'Filter - Fuel / Oil'}, {'name': 'Valve - Fuel / Oil'}]
+# part_categories = [{'name': 'Vane - Turbine'}, {'name': 'Blade - Turbine'}, {'name': 'Fuel Nozzle'}, {'name': 'Seal'}, {'name': 'controller card #1 - ECU'}, {'name': 'controller card #2 - ECU'}, {'name': 'Pump - Fuel'}, {'name': 'Filter - Fuel / Oil'}, {'name': 'Valve - Fuel / Oil'}]
 
-# list to check against high impact vs low impact
-high_impact_parts = ['Vane - Turbine', 'Blade - Turbine']
-sensors = [c for c in spark.read.parquet(folder_sensor).columns if "sensor" in c]
+# # list to check against high impact vs low impact
+# high_impact_parts = ['Vane - Turbine', 'Blade - Turbine']
+# # sensors = get_sensor_columns(folder_sensor, spark)
 
-# TODO Can be changed if using more than sensors B, D, F
-low_impact_sensors = [s for s in sensors if s != 'sensor_F']
+# # Get sensor categorization from the sensor data generator
+# sensor_categories = get_sensor_impact_categories()
 
-parts = []
-for p in part_categories:
-  # Add a conditional in here to only assosciate high impact parts with sensor F failures
-  nsn = faker.ean(length=8)
-  for location in stock_data['stock_location']:
-    part = {}
-    part['NSN'] = nsn
-    part['type'] = p['name']
-    part['width'] = rd.randint(100,2000)
-    part['height'] = rd.randint(100,2000)
-    part['weight'] = rd.randint(100,20000)
-    part['stock_available'] = rd.randint(0, 10)
-    part['stock_location'] =  location
-    part['production_time'] = rd.randint(0, 5)
-    #part['approvisioning_estimated_days'] = rd.randint(30,360)
-    if p['name'] in high_impact_parts:
-      part['sensors'] = ['sensor_F']
-    else:
-      #part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,3))
-      # Parts only assigned to 1 sensor
-      part['sensors'] = random.sample(low_impact_sensors, rd.randint(1,2))
-    parts.append(part)
+# parts = []
+# for p in part_categories:
+#   # Associate parts with appropriate sensors based on maintenance impact level
+#   nsn = faker.ean(length=8)
+#   for location in stock_data['stock_location']:
+#     part = {}
+#     part['NSN'] = nsn
+#     part['type'] = p['name']
+#     part['width'] = rd.randint(100,2000)
+#     part['height'] = rd.randint(100,2000)
+#     part['weight'] = rd.randint(100,20000)
+#     part['stock_available'] = rd.randint(0, 10)
+#     part['stock_location'] =  location
+#     part['production_time'] = rd.randint(0, 5)
+#     #part['approvisioning_estimated_days'] = rd.randint(30,360)
+#     if p['name'] in high_impact_parts:
+#       part['sensors'] = sensor_categories['high_impact_sensors']
+#     else:
+#       # Parts can be associated with moderate or low impact sensors
+#       part['sensors'] = random.sample(sensor_categories['all_non_high_impact'], rd.randint(1,2))
+#     parts.append(part)
 
-# Join synthetic parts data with stock locations
-pubsec_stock_joined = pd.DataFrame(parts).merge(stock_data, on='stock_location', suffixes=('', '_pubsec'))
+# # Join synthetic parts data with stock locations
+# pubsec_stock_joined = pd.DataFrame(parts).merge(stock_data, on='stock_location', suffixes=('', '_pubsec'))
 
-# Create spark df, write to volume 
-df = spark.createDataFrame(pubsec_stock_joined)
-folder_parts = folder+'/parts_pub'
-df.write.mode('overwrite').format('json').save(folder_parts)
-cleanup(folder_parts)
+# # Create spark df, write to volume 
+# df = spark.createDataFrame(pubsec_stock_joined)
+# folder_parts = folder+'/parts_pub'
+
+# save_sensor_data(df, folder_parts)
+
+# # df.write.mode('overwrite').format('json').save(folder_parts)
+# # cleanup(folder_parts)
 
 # COMMAND ----------
 
@@ -563,37 +502,32 @@ cleanup(folder_parts)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import lit
-from pyspark.sql.functions import monotonically_increasing_id, floor, lit, hash, abs
-import pandas as pd
+# from pyspark.sql.functions import lit
+# from pyspark.sql.functions import monotonically_increasing_id, floor, lit, hash, abs
+# import pandas as pd
 
-file_location = "./platform_csvs/PdM_Platform_Data - navy_platform_data.csv"
-pandas_df = pd.read_csv(file_location)
-ships = spark.createDataFrame(pandas_df)
-# OLD CODE doesn't work with new csv file 
-# ships = spark.read.format("csv") \
-#   .option("inferSchema", "false") \
-#   .option("header", "true") \
-#   .option("sep", ",") \
-#   .load(file_location)
-ships = ships.withColumn("join_key", monotonically_increasing_id())
+# file_location = "./platform_csvs/PdM_Platform_Data - navy_platform_data.csv"
+# pandas_df = pd.read_csv(file_location)
+# ships = spark.createDataFrame(pandas_df)
 
-# Get total number of ships for Turbine ID assignment
-num_ships = ships.select('designator').count()
-status = (spark.read.format('json').load(folder_status)
-          .drop('end_time')
-          .drop('start_time')
-          .drop('abnormal_sensor')
-          .withColumn('model', lit('LM2500'))
-          .withColumn('join_key', monotonically_increasing_id() % num_ships)
-          )
+# ships = ships.withColumn("join_key", monotonically_increasing_id())
 
-# Assign turbine ID to ship metadata
-ship_meta = ships.join(status, 'join_key').drop('join_key').withColumn('designator_id', abs(hash('designator')))
+# # Get total number of ships for Turbine ID assignment
+# num_ships = ships.select('designator').count()
+# status = (spark.read.format('json').load(folder_status)
+#           .drop('end_time')
+#           .drop('start_time')
+#           .drop('abnormal_sensor')
+#           .withColumn('model', lit('LM2500'))
+#           .withColumn('join_key', monotonically_increasing_id() % num_ships)
+#           )
 
-folder_ship = folder+'/ship_meta'
-ship_meta.write.mode('overwrite').format('json').save(folder_ship)
-cleanup(folder_ship)
+# # Assign turbine ID to ship metadata
+# ship_meta = ships.join(status, 'join_key').drop('join_key').withColumn('designator_id', abs(hash('designator')))
+
+# folder_ship = folder+'/ship_meta'
+# ship_meta.write.mode('overwrite').format('json').save(folder_ship)
+# cleanup(folder_ship)
 
 
 # COMMAND ----------
@@ -603,28 +537,28 @@ cleanup(folder_ship)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import lit
-from pyspark.sql.functions import monotonically_increasing_id, floor, lit
+# from pyspark.sql.functions import lit
+# from pyspark.sql.functions import monotonically_increasing_id, floor, lit
 
-file_location = "./platform_csvs/PdM_Platform_Data - pubsec_platform_data.csv"
-pandas_df = pd.read_csv(file_location)
-ships = spark.createDataFrame(pandas_df)
+# file_location = "./platform_csvs/PdM_Platform_Data - pubsec_platform_data.csv"
+# pandas_df = pd.read_csv(file_location)
+# ships = spark.createDataFrame(pandas_df)
 
-ships = ships.withColumn("join_key", monotonically_increasing_id())
+# ships = ships.withColumn("join_key", monotonically_increasing_id())
 
-folder_status = folder+'/historical_turbine_status'
-# Get total number of ships for Turbine ID assignment
-num_ships = ships.select('designator').count()
-status = (spark.read.format('json').load(folder_status)
-          .drop('end_time')
-          .drop('start_time')
-          .drop('abnormal_sensor')
-          .withColumn('model', lit('LM2500'))
-          .withColumn('join_key', monotonically_increasing_id() % num_ships)
-          )
-# # Assign turbine ID to ship metadata
-ship_meta = ships.join(status, 'join_key').drop('join_key').withColumn('designator_id', abs(hash('designator')))
+# folder_status = folder+'/historical_turbine_status'
+# # Get total number of ships for Turbine ID assignment
+# num_ships = ships.select('designator').count()
+# status = (spark.read.format('json').load(folder_status)
+#           .drop('end_time')
+#           .drop('start_time')
+#           .drop('abnormal_sensor')
+#           .withColumn('model', lit('LM2500'))
+#           .withColumn('join_key', monotonically_increasing_id() % num_ships)
+#           )
+# # # Assign turbine ID to ship metadata
+# ship_meta = ships.join(status, 'join_key').drop('join_key').withColumn('designator_id', abs(hash('designator')))
 
-folder_platform = folder+'/platform_meta'
-ship_meta.write.mode('overwrite').format('json').save(folder_platform)
-cleanup(folder_platform)
+# folder_platform = folder+'/platform_meta'
+# ship_meta.write.mode('overwrite').format('json').save(folder_platform)
+# cleanup(folder_platform)

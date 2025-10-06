@@ -160,11 +160,11 @@
 -- COMMAND ----------
 
 -- DBTITLE 1,Turbine metadata
--- CREATE OR REFRESH STREAMING TABLE turbine ( 
---   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL) 
--- )
--- COMMENT "Turbine details, with location, wind turbine model type etc"
--- SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/turbine/", "json", map("cloudFiles.inferColumnTypes" , "true"));
+CREATE OR REFRESH STREAMING TABLE turbine ( 
+  CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL) 
+)
+COMMENT "Turbine details, with location, wind turbine model type etc"
+SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/turbine/", "json", map("cloudFiles.inferColumnTypes" , "true"));
 
 -- COMMAND ----------
 
@@ -179,30 +179,25 @@ AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/incoming_dat
 -- COMMAND ----------
 
 -- DBTITLE 1,Historical status
-CREATE OR REFRESH STREAMING TABLE historical_sensor_bronze (
+CREATE OR REFRESH STREAMING TABLE historical_turbine_status (
   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL)
 )
 COMMENT "Turbine status to be used as label in our predictive maintenance model (to know which turbine is potentially faulty)"
-AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/historical_sensor_data", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/historical_turbine_status", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Ship metadata
-CREATE OR REFRESH STREAMING TABLE ship_meta 
+CREATE STREAMING TABLE ship_meta 
 COMMENT "Ship to turbine Meta_Data mapping"
-AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/meta_${demo}", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/meta_${demo}", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Parts and stock information
-CREATE OR REFRESH STREAMING TABLE parts_bronze 
+CREATE STREAMING TABLE parts 
 COMMENT "Turbine parts from our manufacturing system"
-AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/parts_${demo}", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
-
--- COMMAND ----------
-
-CREATE OR REFRESH MATERIALIZED VIEW maintenance_actions AS
-SELECT * FROM ${catalog}.${db}.sensor_maintenance
+AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/parts_${demo}", "json", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
@@ -218,38 +213,7 @@ SELECT * FROM ${catalog}.${db}.sensor_maintenance
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW parts_silver AS
-SELECT * EXCEPT(_rescued_data) FROM parts_bronze
-
--- COMMAND ----------
-
-CREATE OR REFRESH MATERIALIZED VIEW historical_sensor_silver (
-  CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL)  ON VIOLATION DROP ROW,
-  CONSTRAINT timestamp_valid EXPECT (hourly_timestamp IS not NULL)  ON VIOLATION DROP ROW
-)
-COMMENT "Hourly sensor stats, used to describe signal and detect anomalies"
-AS
-SELECT turbine_id,
-      abnormal_sensor, 
-      date_trunc('hour', from_unixtime(timestamp)) AS hourly_timestamp, 
-      avg(energy)          as avg_energy,
-      stddev_pop(sensor_A) as std_sensor_A,
-      stddev_pop(sensor_B) as std_sensor_B,
-      stddev_pop(sensor_C) as std_sensor_C,
-      stddev_pop(sensor_D) as std_sensor_D,
-      stddev_pop(sensor_E) as std_sensor_E,
-      stddev_pop(sensor_F) as std_sensor_F,
-      percentile_approx(sensor_A, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_A,
-      percentile_approx(sensor_B, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_B,
-      percentile_approx(sensor_C, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_C,
-      percentile_approx(sensor_D, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_D,
-      percentile_approx(sensor_E, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_E,
-      percentile_approx(sensor_F, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_F
-  FROM historical_sensor_bronze GROUP BY hourly_timestamp, turbine_id, abnormal_sensor
-
--- COMMAND ----------
-
-CREATE OR REFRESH MATERIALIZED VIEW sensor_silver (
+CREATE LIVE TABLE sensor_hourly (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL)  ON VIOLATION DROP ROW,
   CONSTRAINT timestamp_valid EXPECT (hourly_timestamp IS not NULL)  ON VIOLATION DROP ROW
 )
@@ -270,7 +234,7 @@ SELECT turbine_id,
       percentile_approx(sensor_D, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_D,
       percentile_approx(sensor_E, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_E,
       percentile_approx(sensor_F, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_F
-  FROM sensor_bronze GROUP BY hourly_timestamp, turbine_id
+  FROM LIVE.sensor_bronze GROUP BY hourly_timestamp, turbine_id
 
 -- COMMAND ----------
 
@@ -286,16 +250,12 @@ SELECT turbine_id,
 
 -- COMMAND ----------
 
--- CREATE LIVE TABLE turbine_training_dataset 
--- COMMENT "Hourly sensor stats, used to describe signal and detect anomalies"
--- AS
--- SELECT * except(t._rescued_data, s._rescued_data, m.turbine_id) FROM LIVE.sensor_hourly m
---     INNER JOIN LIVE.turbine t USING (turbine_id)
---     INNER JOIN LIVE.historical_turbine_status s ON m.turbine_id = s.turbine_id AND from_unixtime(s.start_time) < m.hourly_timestamp AND from_unixtime(s.end_time) > m.hourly_timestamp
-
-CREATE OR REFRESH MATERIALIZED VIEW turbine_training_dataset AS
-SELECT * FROM historical_sensor_silver 
-    
+CREATE LIVE TABLE turbine_training_dataset 
+COMMENT "Hourly sensor stats, used to describe signal and detect anomalies"
+AS
+SELECT * except(t._rescued_data, s._rescued_data, m.turbine_id) FROM LIVE.sensor_hourly m
+    INNER JOIN LIVE.turbine t USING (turbine_id)
+    INNER JOIN LIVE.historical_turbine_status s ON m.turbine_id = s.turbine_id AND from_unixtime(s.start_time) < m.hourly_timestamp AND from_unixtime(s.end_time) > m.hourly_timestamp
 
 -- COMMAND ----------
 
@@ -328,24 +288,25 @@ SELECT * FROM historical_sensor_silver
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW current_status_predictions 
+CREATE LIVE TABLE turbine_current_status 
 COMMENT "Navy gas turbine last status based on model prediction"
 AS
 WITH latest_metrics AS (
-  SELECT *, ROW_NUMBER() OVER(PARTITION BY turbine_id, hourly_timestamp ORDER BY hourly_timestamp DESC) AS row_number 
-  FROM sensor_silver
-  INNER JOIN ship_meta t USING (turbine_id)
+  SELECT *, ROW_NUMBER() OVER(PARTITION BY turbine_id, hourly_timestamp ORDER BY hourly_timestamp DESC) AS row_number FROM LIVE.sensor_hourly
+    INNER JOIN LIVE.turbine t USING (turbine_id)
 )
 SELECT * EXCEPT(m.row_number), 
-    predict_maintenance(hourly_timestamp, avg_energy, std_sensor_A, std_sensor_B, std_sensor_C, std_sensor_D, std_sensor_E, std_sensor_F, percentiles_sensor_A, percentiles_sensor_B, percentiles_sensor_C, percentiles_sensor_D, percentiles_sensor_E, percentiles_sensor_F) as prediction 
+    predict_maintenance(hourly_timestamp, avg_energy, std_sensor_A, std_sensor_B, std_sensor_C, std_sensor_D, std_sensor_E, std_sensor_F, percentiles_sensor_A, percentiles_sensor_B, percentiles_sensor_C, percentiles_sensor_D, percentiles_sensor_E, percentiles_sensor_F, m.location, m.model, m.state) as prediction 
   FROM latest_metrics m
   WHERE m.row_number=1
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold AS
-SELECT * EXCEPT(_rescued_data, m.fault) FROM current_status_predictions
-LEFT JOIN maintenance_actions m ON prediction = m.fault
+CREATE LIVE TABLE ship_current_status_gold AS
+SELECT t.turbine_id, t.hourly_timestamp, t.prediction, s.* except(s.turbine_id), m.* FROM LIVE.turbine_current_status t
+JOIN LIVE.ship_meta s USING (turbine_id)
+LEFT JOIN ${catalog}.${db}.sensor_maintenance m ON prediction = m.fault
+WHERE hourly_timestamp = (SELECT max(hourly_timestamp) FROM LIVE.turbine_current_status)
 
 -- COMMAND ----------
 

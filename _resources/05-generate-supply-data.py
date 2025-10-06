@@ -45,7 +45,7 @@ from pyspark.sql.types import *
 
 # COMMAND ----------
 
-parts = spark.read.table(f'{catalog}.{db}.parts')
+parts = spark.read.table(f'{catalog}.{db}.parts_silver')
 
 unique_stock_locations = parts.select('stock_location', 'lat', 'long', 'stock_location_id').distinct()
 display(unique_stock_locations)
@@ -55,13 +55,14 @@ coordinates = {row['stock_location_id']: (row['lat'], row['long']) for row in un
 # COMMAND ----------
 
 ship_meta = spark.read.table(f'{catalog}.{db}.ship_meta')
-unique_home_locations = ship_meta.select('home_location', 'lat', 'long').distinct()
+unique_home_locations = ship_meta.select('home_location', 'home_location_id','lat', 'long').distinct()
 
-unique_home_locations = unique_home_locations.withColumn(
-    'home_location_id',
-    concat(lit('home_'), monotonically_increasing_id())
-)
-unique_home_locations.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.demand_mapping")
+#### 
+# unique_home_locations = unique_home_locations.withColumn(
+#     'home_location_id',
+#     concat(lit('home_'), monotonically_increasing_id())
+# )
+# unique_home_locations.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{db}.demand_mapping")
 
 homeport = {row['home_location_id']: (row['lat'], row['long']) for row in unique_home_locations.collect()}
 
@@ -154,7 +155,7 @@ ranked_spark_df.write.format("delta").mode("overwrite").saveAsTable("shipping_co
 
 # COMMAND ----------
 
-parts = spark.read.table(f'{catalog}.{db}.parts').select('type', 'stock_location_id').orderBy('type')
+parts = spark.read.table(f'{catalog}.{db}.parts_silver').select('type', 'stock_location_id').orderBy('type')
 display(parts)
 
 # COMMAND ----------
@@ -164,13 +165,12 @@ display(parts)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import hash, abs
-
-ships = (ship_meta.withColumn('designator_id', abs(hash('designator')))
-         .join(unique_home_locations, on='home_location')
+ships = ship_meta.join(
+    unique_home_locations.drop('home_location'), 
+    on='home_location_id'
 )
 
-ships.display()
+display(ships)
 
 # COMMAND ----------
 
@@ -227,8 +227,8 @@ display(cost_ship.orderBy('type'))
 
 # COMMAND ----------
 
-supply = spark.read.table(f'{catalog}.{db}.parts').select('stock_location_id', 'stock_available', 'type')
-supply = supply.groupBy('type').pivot('stock_location_id').agg({'stock_available':'first'})
+supply = spark.read.table(f'{catalog}.{db}.parts_silver').select('stock_location_id', 'inventory_level', 'type')
+supply = supply.groupBy('type').pivot('stock_location_id').agg({'inventory_level':'first'})
 for name in supply.schema.names:
   if name == 'type':
     continue
@@ -244,9 +244,9 @@ display(supply)
 
 from pyspark.sql.functions import col, array_join, find_in_set
 
-ship_status = spark.read.table(f"{catalog}.{db}.ship_current_status_gold").withColumn('designator_id', abs(hash('designator')))
+ship_status = spark.read.table(f"{catalog}.{db}.ship_current_status_gold")
 
-parts_df = spark.read.table(f"{catalog}.{db}.parts")
+parts_df = spark.read.table(f"{catalog}.{db}.parts_silver")
 
 joined = ship_status.join(
     parts_df,
@@ -255,6 +255,7 @@ joined = ship_status.join(
     (find_in_set(col("prediction"), array_join(col("sensors"), ",")) > 0),
     how="left"
 )
+display(joined)
 
 parts_demand = joined.select("designator_id", "turbine_id", col("type").alias("parts")).distinct()
 display(parts_demand)

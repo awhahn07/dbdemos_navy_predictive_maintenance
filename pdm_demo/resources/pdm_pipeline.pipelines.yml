@@ -14,4 +14,5 @@ resources:
       development: true
       photon: true
       catalog: ${var.catalog}
+      schema: ${var.schema}
       serverless: true

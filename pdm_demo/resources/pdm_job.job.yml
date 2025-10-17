@@ -1,12 +1,12 @@
 resources:
   jobs:
-    dbdemos_navy_turbine_andrew_hahn:
-      name: pdm_job
+    pdm_job:
+      name: "pdm_${var.demo_type}_job"
       tasks:
         - task_key: init_data
           notebook_task:
             notebook_path: ../src/_resources/01-load-data.py
-          job_cluster_key: pubsec_predictive_maintenance
+          job_cluster_key: "${var.demo_type}_cluster"
         - task_key: start_dlt_pipeline
           depends_on:
             - task_key: init_data
@@ -25,27 +25,29 @@ resources:
             - task_key: load_dbsql_and_ml_data
           notebook_task:
             notebook_path: ../src/04-Data-Science-ML/04.1-automl-iot-turbine-predictive-maintenance.py
-          job_cluster_key: pubsec_predictive_maintenance
+          job_cluster_key: "${var.demo_type}_cluster"
         - task_key: register_ml_model
           depends_on:
             - task_key: create_feature_and_automl_run
           notebook_task:
             notebook_path: ../src/04-Data-Science-ML/04.2-AutoML-best-register-model.ipynb
-          job_cluster_key: pubsec_predictive_maintenance
+          job_cluster_key: "${var.demo_type}_cluster"
         - task_key: optimize_supply_routing
           depends_on:
             - task_key: register_ml_model
           notebook_task:
             notebook_path: ../src/05-Supply-Optimization/05.1_Optimize_Transportation.py
+          job_cluster_key: "${var.demo_type}_cluster"
         - task_key: AI_Work_Parts_Orders
           depends_on:
             - task_key: optimize_supply_routing
           notebook_task:
             notebook_path: ../src/07-Generate-tickets/AI_work_orders.ipynb
+          job_cluster_key: "${var.demo_type}_cluster"
       job_clusters:
-        - job_cluster_key: pubsec_predictive_maintenance
+        - job_cluster_key: "${var.demo_type}_cluster"
           new_cluster:
-            cluster_name: ""
+            cluster_name: "pdm_${var.demo_type}_cluster"
             spark_version: 15.1.x-cpu-ml-scala2.12
             spark_conf:
               spark.master: local[*, 4]
@@ -54,13 +56,12 @@ resources:
             custom_tags:
               ResourceClass: SingleNode
               project: dbdemos
-              demo: lakehouse-navy-maintenance
+              demo: "lakehouse-${var.demo_type}-maintenance"
             spark_env_vars:
               PYSPARK_PYTHON: /databricks/python3/bin/python3
-            instance_pool_id: 0727-104344-hauls13-pool-uftxk0r6
+            instance_pool_id: ${var.instance_pool_id}
             data_security_mode: SINGLE_USER
             runtime_engine: STANDARD
             num_workers: 0
       queue:
         enabled: true
-      performance_target: PERFORMANCE_OPTIMIZED

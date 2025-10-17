@@ -47,7 +47,6 @@ resources:
       job_clusters:
         - job_cluster_key: "${var.demo_type}_cluster"
           new_cluster:
-            cluster_name: "pdm_${var.demo_type}_cluster"
             spark_version: 15.1.x-cpu-ml-scala2.12
             spark_conf:
               spark.master: local[*, 4]

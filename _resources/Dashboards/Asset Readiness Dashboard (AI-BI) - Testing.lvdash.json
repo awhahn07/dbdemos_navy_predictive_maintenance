@@ -4319,6 +4319,38 @@
         }
       ],
       "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "9f8166fc",
+      "displayName": "Untitled page",
+      "layout": [
+        {
+          "widget": {
+            "name": "d53835e6",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6cee62b2",
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {}
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
     }
   ],
   "uiSettings": {

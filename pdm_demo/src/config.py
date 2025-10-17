@@ -29,7 +29,7 @@ volume_name = "raw_landing"
 
 # COMMAND ----------
 
-demo_type = "DoD"
+demo_type = "navy"
 print(f"demo_type: {demo_type}")
 
 if demo_type == "pubsec":

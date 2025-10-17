@@ -20,18 +20,13 @@
         "  percentiles_sensor_D, \n",
         "  percentiles_sensor_E, \n",
         "  percentiles_sensor_F, \n",
-        "  country, \n",
         "  CAST(lat AS DOUBLE) AS lat, \n",
-        "  location, \n",
         "  CAST(long AS DOUBLE) AS long, \n",
-        "  model, \n",
-        "  state, \n",
-        "  _rescued_data, \n",
         "  prediction \n",
-        "FROM turbine_current_status;"
+        "FROM current_status_predictions;"
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "schema": "predictive_maintenance_navy_test"
     },
     {
       "name": "8f4e7b0e",
@@ -43,20 +38,32 @@
         "FROM sensor_bronze;"
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "schema": "predictive_maintenance_navy_test"
     },
     {
       "name": "56022a56",
       "displayName": "Ship GTE Readiness",
       "queryLines": [
-        "SELECT designator, home_location, lat, long,\n",
-        "    CASE \n",
-        "        WHEN MAX(CASE WHEN operable = 'false' THEN 1 ELSE 0 END) >= 1 THEN 'red'\n",
-        "        WHEN COUNT(fault) >= 1 THEN 'yellow'\n",
-        "        ELSE 'green'\n",
-        "    END AS status \n",
-        "FROM ship_current_status_gold\n",
-        "GROUP BY ALL;"
+        "-- SELECT designator, home_location, lat, long,\n",
+        "--     CASE \n",
+        "--         WHEN MAX(CASE WHEN operable = 'false' THEN 1 ELSE 0 END) >= 1 THEN 'red'\n",
+        "--         WHEN COUNT(prediction) >= 1 THEN 'yellow'\n",
+        "--         ELSE 'green'\n",
+        "--     END AS status \n",
+        "-- FROM ship_current_status_gold\n",
+        "-- GROUP BY ALL;\n",
+        "\n",
+        "SELECT\n",
+        "  turbine_id,\n",
+        "  designator,\n",
+        "  home_location,\n",
+        "  CASE\n",
+        "    WHEN prediction = 'ok' THEN 'green'\n",
+        "    WHEN prediction = 'sensor_F' THEN 'red'\n",
+        "    ELSE 'yellow'\n",
+        "  END AS status\n",
+        "FROM public_sector.predictive_maintenance_navy.ship_current_status_gold\n",
+        "QUALIFY hourly_timestamp = max(hourly_timestamp) OVER ()"
       ],
       "columns": [
         {
@@ -76,20 +83,20 @@
         }
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "schema": "predictive_maintenance_navy_test"
     },
     {
       "name": "b03817ba",
       "displayName": "Faulty Parts Count",
       "queryLines": [
         "SELECT COUNT(*) num_faults, p.type FROM ship_current_status_gold AS s\n",
-        "LEFT JOIN parts p\n",
+        "LEFT JOIN parts_silver p\n",
         "ON find_in_set(s.prediction, array_join(p.sensors, ',')) > 0\n",
         "WHERE prediction != 'ok' AND type IS NOT NULL\n",
         "GROUP BY ALL"
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "schema": "predictive_maintenance_navy_test"
     },
     {
       "name": "5b753ffe",
@@ -110,7 +117,7 @@
         "    GROUP BY prediction, home_location\n",
         "), \n",
         "p AS (\n",
-        "    SELECT stock_location, parts.type part, stock_available stock, \n",
+        "    SELECT stock_location, parts_silver.type part, inventory_level stock, \n",
         "            CASE \n",
         "                WHEN stock_location = 'FLC Norfolk' THEN 'NB Norfolk'\n",
         "                WHEN stock_location = 'FLC Jacksonville' THEN 'NS Mayport'\n",
@@ -119,7 +126,7 @@
         "                WHEN stock_location = 'FLC Puget Sound' THEN 'NB San Diego'\n",
         "            END nearest_homeport\n",
         "            , sensor  -- Include a new column to store the exploded sensor value\n",
-        "    FROM parts\n",
+        "    FROM parts_silver\n",
         "    LATERAL VIEW explode(sensors) p_ex AS sensor\n",
         ")\n",
         "\n",
@@ -223,8 +230,8 @@
                   "datasetName": "56022a56",
                   "fields": [
                     {
-                      "name": "count(*)",
-                      "expression": "COUNT(`*`)"
+                      "name": "countdistinct(turbine_id)",
+                      "expression": "COUNT(DISTINCT `turbine_id`)"
                     },
                     {
                       "name": "avg(Status - Yellow)",
@@ -251,7 +258,7 @@
                   "displayName": "Average Status - Yellow"
                 },
                 "target": {
-                  "fieldName": "count(*)",
+                  "fieldName": "countdistinct(turbine_id)",
                   "displayName": "Count of Records"
                 }
               },
@@ -286,10 +293,6 @@
                     {
                       "name": "status",
                       "expression": "`status`"
-                    },
-                    {
-                      "name": "home_location",
-                      "expression": "`home_location`"
                     }
                   ],
                   "disaggregated": true
@@ -325,8 +328,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "designator"
+                    "preserveWhitespace": false
                   },
                   {
                     "fieldName": "status",
@@ -352,91 +354,11 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "status"
-                  },
-                  {
-                    "fieldName": "home_location",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 4,
-                    "title": "home_location",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "home_location"
+                    "preserveWhitespace": false
                   }
                 ]
               },
               "invisibleColumns": [
-                {
-                  "numberFormat": "0.00",
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "lat",
-                  "type": "float",
-                  "displayAs": "string",
-                  "order": 2,
-                  "title": "lat",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "numberFormat": "0.00",
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "long",
-                  "type": "float",
-                  "displayAs": "string",
-                  "order": 3,
-                  "title": "long",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
                 {
                   "numberFormat": "0",
                   "booleanValues": [
@@ -510,6 +432,31 @@
                   "title": "Status - Red",
                   "allowSearch": false,
                   "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "turbine_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100000,
+                  "title": "turbine_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
                   "allowHTML": false,
                   "highlightLinks": false,
                   "useMonospaceFont": false,
@@ -625,8 +572,8 @@
                   "datasetName": "56022a56",
                   "fields": [
                     {
-                      "name": "countdistinct(designator)",
-                      "expression": "COUNT(DISTINCT `designator`)"
+                      "name": "countdistinct(turbine_id)",
+                      "expression": "COUNT(DISTINCT `turbine_id`)"
                     },
                     {
                       "name": "avg(Status - Green)",
@@ -653,7 +600,7 @@
                   "displayName": "Average Status - Green"
                 },
                 "target": {
-                  "fieldName": "countdistinct(designator)",
+                  "fieldName": "countdistinct(turbine_id)",
                   "displayName": "Count of Unique designator"
                 }
               },
@@ -682,8 +629,8 @@
                   "datasetName": "56022a56",
                   "fields": [
                     {
-                      "name": "count(*)",
-                      "expression": "COUNT(`*`)"
+                      "name": "countdistinct(turbine_id)",
+                      "expression": "COUNT(DISTINCT `turbine_id`)"
                     },
                     {
                       "name": "sum(Status - Red)",
@@ -711,7 +658,7 @@
                   "displayName": "Sum of Status - Red"
                 },
                 "target": {
-                  "fieldName": "count(*)",
+                  "fieldName": "countdistinct(turbine_id)",
                   "displayName": "Count of Records"
                 }
               },
@@ -1371,8 +1318,8 @@
                   "datasetName": "5b753ffe",
                   "fields": [
                     {
-                      "name": "fault",
-                      "expression": "`fault`"
+                      "name": "prediction",
+                      "expression": "`prediction`"
                     },
                     {
                       "name": "turbine_id",
@@ -1402,14 +1349,14 @@
                   "displayName": "designator"
                 },
                 "y": {
-                  "fieldName": "fault",
+                  "fieldName": "prediction",
                   "scale": {
                     "type": "categorical"
                   },
                   "displayName": "fault"
                 },
                 "color": {
-                  "fieldName": "fault",
+                  "fieldName": "prediction",
                   "scale": {
                     "type": "categorical",
                     "mappings": [
@@ -1473,10 +1420,6 @@
                   "datasetName": "5b753ffe",
                   "fields": [
                     {
-                      "name": "fault",
-                      "expression": "`fault`"
-                    },
-                    {
                       "name": "turbine_id",
                       "expression": "`turbine_id`"
                     }
@@ -1490,33 +1433,6 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {
-                    "fieldName": "fault",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 1,
-                    "title": "fault",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "fault"
-                  },
                   {
                     "fieldName": "turbine_id",
                     "booleanValues": [
@@ -1541,8 +1457,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "turbine_id"
+                    "preserveWhitespace": false
                   }
                 ]
               },
@@ -1641,56 +1556,6 @@
                   "displayAs": "string",
                   "order": 7,
                   "title": "long",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "model",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 8,
-                  "title": "model",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "_rescued_data",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 9,
-                  "title": "_rescued_data",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1843,6 +1708,363 @@
                   "displayAs": "string",
                   "order": 100011,
                   "title": "maintenance_type",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "avg_energy",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100002,
+                  "title": "avg_energy",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_A",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100003,
+                  "title": "std_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_B",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100004,
+                  "title": "std_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_C",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100005,
+                  "title": "std_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_D",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100006,
+                  "title": "std_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_E",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100007,
+                  "title": "std_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_F",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100008,
+                  "title": "std_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_A",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100009,
+                  "title": "percentiles_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_B",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100010,
+                  "title": "percentiles_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_C",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100011,
+                  "title": "percentiles_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_D",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100012,
+                  "title": "percentiles_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_E",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100013,
+                  "title": "percentiles_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_F",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100014,
+                  "title": "percentiles_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100020,
+                  "title": "home_location_id",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -2135,10 +2357,6 @@
                       "expression": "`turbine_id`"
                     },
                     {
-                      "name": "fault",
-                      "expression": "`fault`"
-                    },
-                    {
                       "name": "operable",
                       "expression": "`operable`"
                     }
@@ -2176,35 +2394,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "turbine_id"
-                  },
-                  {
-                    "fieldName": "fault",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 2,
-                    "title": "fault",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "fault"
+                    "preserveWhitespace": false
                   },
                   {
                     "fieldName": "operable",
@@ -2230,8 +2420,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "operable"
+                    "preserveWhitespace": false
                   }
                 ]
               },
@@ -2280,56 +2469,6 @@
                   "displayAs": "string",
                   "order": 5,
                   "title": "prediction",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "model",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 7,
-                  "title": "model",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "_rescued_data",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 8,
-                  "title": "_rescued_data",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -2509,6 +2648,363 @@
                   "displayAs": "string",
                   "order": 100009,
                   "title": "maintenance_type",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "avg_energy",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100002,
+                  "title": "avg_energy",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_A",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100003,
+                  "title": "std_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_B",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100004,
+                  "title": "std_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_C",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100005,
+                  "title": "std_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_D",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100006,
+                  "title": "std_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_E",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100007,
+                  "title": "std_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_F",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100008,
+                  "title": "std_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_A",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100009,
+                  "title": "percentiles_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_B",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100010,
+                  "title": "percentiles_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_C",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100011,
+                  "title": "percentiles_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_D",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100012,
+                  "title": "percentiles_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_E",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100013,
+                  "title": "percentiles_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_F",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100014,
+                  "title": "percentiles_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100018,
+                  "title": "home_location_id",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,

@@ -1,0 +1,20 @@
+resources:
+  pipelines:
+    pdm_pipeline:
+      name: pdm_pipeline
+      configuration:
+        catalog: public_sector
+        demo: navy
+        db: predictive_maintenance_navy
+      libraries:
+        - notebook:
+            # source: WORKSPACE
+            path: ../src/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL.sql
+        - notebook:
+            # source: WORKSPACE
+            path: ../src/01-Data-Ingestion/01.2-DLT-Navy-GasTurbine-SQL-UDF.py
+      schema: predictive_maintenance_navy
+      development: true
+      photon: true
+      catalog: public_sector
+      serverless: true

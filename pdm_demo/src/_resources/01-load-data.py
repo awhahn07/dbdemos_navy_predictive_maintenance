@@ -235,7 +235,7 @@ BASE_CSV_PATH = Path("./platform_csvs")
 PUBSEC_PLATFORM_DATA = BASE_CSV_PATH / "PdM_Platform_Data - pubsec_platform_data.csv"
 NAVY_PLATFORM_DATA = BASE_CSV_PATH / "PdM_Platform_Data - navy_platform_data.csv"
 
-if demo_type == 'navy' or demo_type == 'DoD':
+if demo_type == 'navy':
   path = NAVY_PLATFORM_DATA
 elif demo_type == 'pubsec':
   path = PUBSEC_PLATFORM_DATA
@@ -375,7 +375,7 @@ save_sensor_data(platform_meta, folder+f"/meta_{demo_type}", partitions=5, clean
 
 # COMMAND ----------
 
-if demo_type == 'navy' or demo_type == 'DoD':
+if demo_type == 'navy':
   path = './platform_csvs/PdM_Platform_Data - navy_stock_location_data.csv'
 elif demo_type == 'pubsec':
   path = './platform_csvs/PdM_Platform_Data - pubsec_stock_location_data.csv'

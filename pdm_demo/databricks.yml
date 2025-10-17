@@ -49,7 +49,7 @@ targets:
       workspace_host: "https://e2-demo-field-eng.cloud.databricks.com"
       instance_pool_id: "0727-104344-hauls13-pool-uftxk0r6"
       user_email: "andrew.hahn@databricks.com"
-      schema: "predictive_maintenance_dev"
+      # schema: "predictive_maintenance_dev"
     workspace:
       host: https://e2-demo-field-eng.cloud.databricks.com 
       #${var.workspace_host}
@@ -66,7 +66,7 @@ targets:
       workspace_host: "https://e2-demo-field-eng.cloud.databricks.com" 
       instance_pool_id: "0727-104344-hauls13-pool-uftxk0r6"
       user_email: "andrew.hahn@databricks.com"
-      schema: "predictive_maintenance_prod"
+      # schema: "predictive_maintenance_prod"
     workspace:
       host: ${var.workspace_host}
       root_path: /Users/${var.user_email}/.bundle/${bundle.name}/${bundle.target}

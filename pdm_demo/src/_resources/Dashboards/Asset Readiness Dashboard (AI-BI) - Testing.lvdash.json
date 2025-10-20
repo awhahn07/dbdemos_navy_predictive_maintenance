@@ -1,52 +1,7 @@
 {
   "datasets": [
     {
-      "name": "f261bf85",
-      "displayName": "Current Turbine Status",
-      "queryLines": [
-        "SELECT \n",
-        "  turbine_id, \n",
-        "  hourly_timestamp, \n",
-        "  avg_energy, \n",
-        "  std_sensor_A, \n",
-        "  std_sensor_B, \n",
-        "  std_sensor_C, \n",
-        "  std_sensor_D, \n",
-        "  std_sensor_E, \n",
-        "  std_sensor_F, \n",
-        "  percentiles_sensor_A, \n",
-        "  percentiles_sensor_B, \n",
-        "  percentiles_sensor_C, \n",
-        "  percentiles_sensor_D, \n",
-        "  percentiles_sensor_E, \n",
-        "  percentiles_sensor_F, \n",
-        "  country, \n",
-        "  CAST(lat AS DOUBLE) AS lat, \n",
-        "  location, \n",
-        "  CAST(long AS DOUBLE) AS long, \n",
-        "  model, \n",
-        "  state, \n",
-        "  _rescued_data, \n",
-        "  prediction \n",
-        "FROM turbine_current_status;"
-      ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
-    },
-    {
-      "name": "8f4e7b0e",
-      "displayName": "Turbine sensors",
-      "queryLines": [
-        "SELECT \n",
-        "  from_unixtime(timestamp) as timestamp_datetime, \n",
-        "  * \n",
-        "FROM sensor_bronze;"
-      ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
-    },
-    {
-      "name": "56022a56",
+      "name": "6cee62b2",
       "displayName": "Ship GTE Readiness",
       "queryLines": [
         "SELECT designator, home_location, lat, long,\n",
@@ -79,7 +34,7 @@
       "schema": "predictive_maintenance_navy"
     },
     {
-      "name": "b03817ba",
+      "name": "4bf52947",
       "displayName": "Faulty Parts Count",
       "queryLines": [
         "SELECT COUNT(*) num_faults, p.type FROM ship_current_status_gold AS s\n",
@@ -88,20 +43,20 @@
         "WHERE prediction != 'ok' AND type IS NOT NULL\n",
         "GROUP BY ALL"
       ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
     },
     {
-      "name": "5b753ffe",
+      "name": "0aff856e",
       "displayName": "Ship GTE faulty",
       "queryLines": [
         "select * from ship_current_status_gold where prediction != 'ok'"
       ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
     },
     {
-      "name": "a4f03de4",
+      "name": "66f9103e",
       "displayName": "Stock Deficit by Location",
       "queryLines": [
         "WITH s AS (\n",
@@ -128,11 +83,11 @@
         "LEFT JOIN p ON s.prediction = p.sensor AND p.nearest_homeport = s.home_location\n",
         "WHERE (s.num_faults - p.stock) > 0 AND (s.num_faults - p.stock) IS NOT NULL;"
       ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
     },
     {
-      "name": "e94523f9",
+      "name": "1124505b",
       "displayName": "ship_current_status_gold",
       "queryLines": [
         "SELECT * \n",
@@ -141,11 +96,83 @@
         "CAST(long AS DOUBLE) AS long \n",
         "FROM ship_current_status_gold"
       ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
     },
     {
-      "name": "04bc5e97",
+      "name": "f0a18247",
+      "displayName": "Shipment with Homeports",
+      "queryLines": [
+        "WITH srn AS (\n",
+        "  SELECT \n",
+        "    REPLACE(designator, '_', ' ') AS designator, \n",
+        "    type, \n",
+        "    stock_location, \n",
+        "    qty_shipped \n",
+        "  FROM \n",
+        "    shipment_recommendations\n",
+        ")\n",
+        "SELECT \n",
+        "  srn.*, \n",
+        "  sm.home_location \n",
+        "FROM \n",
+        "  srn\n",
+        "JOIN \n",
+        "  ship_meta AS sm \n",
+        "ON \n",
+        "  sm.designator LIKE CONCAT('%', srn.designator, '%')\n",
+        "WHERE srn.qty_shipped > 0"
+      ],
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
+    },
+    {
+      "name": "f261bf85",
+      "displayName": "Current Turbine Status",
+      "queryLines": [
+        "SELECT \n",
+        "  turbine_id, \n",
+        "  hourly_timestamp, \n",
+        "  avg_energy, \n",
+        "  std_sensor_A, \n",
+        "  std_sensor_B, \n",
+        "  std_sensor_C, \n",
+        "  std_sensor_D, \n",
+        "  std_sensor_E, \n",
+        "  std_sensor_F, \n",
+        "  percentiles_sensor_A, \n",
+        "  percentiles_sensor_B, \n",
+        "  percentiles_sensor_C, \n",
+        "  percentiles_sensor_D, \n",
+        "  percentiles_sensor_E, \n",
+        "  percentiles_sensor_F, \n",
+        "  country, \n",
+        "  CAST(lat AS DOUBLE) AS lat, \n",
+        "  location, \n",
+        "  CAST(long AS DOUBLE) AS long, \n",
+        "  model, \n",
+        "  state, \n",
+        "  _rescued_data, \n",
+        "  prediction \n",
+        "FROM turbine_current_status;"
+      ],
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
+    },
+    {
+      "name": "8f4e7b0e",
+      "displayName": "Turbine sensors",
+      "queryLines": [
+        "SELECT \n",
+        "  from_unixtime(timestamp) as timestamp_datetime, \n",
+        "  * \n",
+        "FROM sensor_bronze;"
+      ],
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
+    },
+    {
+      "name": "8a940a4b",
       "displayName": "Shipment with Home Location",
       "queryLines": [
         "WITH homes AS (\n",
@@ -157,8 +184,8 @@
         "JOIN homes ON shipment_recommendations.designator = homes.designator\n",
         "WHERE qty_shipped > 0"
       ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
+      "catalog": "ahahn_demo",
+      "schema": "dbdemos_pubsec_pdm"
     }
   ],
   "pages": [
@@ -171,9 +198,9 @@
             "name": "083e90b2",
             "queries": [
               {
-                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bdee621e63a83fd17011af8df8_home_location",
+                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_home_location",
                 "query": {
-                  "datasetName": "56022a56",
+                  "datasetName": "6cee62b2",
                   "fields": [
                     {
                       "name": "home_location",
@@ -190,18 +217,18 @@
             ],
             "spec": {
               "version": 2,
-              "widgetType": "filter-single-select",
+              "widgetType": "filter-multi-select",
               "encodings": {
                 "fields": [
                   {
                     "fieldName": "home_location",
                     "displayName": "home_location",
-                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bdee621e63a83fd17011af8df8_home_location"
+                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_home_location"
                   }
                 ]
               },
               "frame": {
-                "title": "Readiness - Homeport",
+                "title": "Readiness - Site",
                 "showTitle": true
               }
             }
@@ -220,7 +247,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "56022a56",
+                  "datasetName": "6cee62b2",
                   "fields": [
                     {
                       "name": "count(*)",
@@ -256,9 +283,9 @@
                 }
               },
               "frame": {
-                "title": "GTE Readiness",
+                "title": "Total Transport Fleet Readiness",
                 "showTitle": true,
-                "description": "Need Maintenance\nTotal fleet GTEs predicted to require maintenance",
+                "description": "Need Maintenance\nTotal assets predicted to require maintenance",
                 "showDescription": true
               }
             }
@@ -277,7 +304,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "56022a56",
+                  "datasetName": "6cee62b2",
                   "fields": [
                     {
                       "name": "designator",
@@ -454,7 +481,7 @@
                   "name": "Status - Green",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 5,
+                  "order": 100005,
                   "title": "Status - Green",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -480,7 +507,7 @@
                   "name": "Status - Yellow",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 6,
+                  "order": 100006,
                   "title": "Status - Yellow",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -506,7 +533,7 @@
                   "name": "Status - Red",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 7,
+                  "order": 100007,
                   "title": "Status - Red",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -522,18 +549,18 @@
               "condensed": true,
               "withRowNumber": false,
               "frame": {
-                "title": "Readiness by ship",
+                "title": "Readiness Status by Platform",
                 "showTitle": true,
-                "description": "Readiness status by ship - filterable by homeport\n",
+                "description": "Readiness status - filterable by site\n",
                 "showDescription": true
               }
             }
           },
           "position": {
             "x": 3,
-            "y": 6,
+            "y": 7,
             "width": 3,
-            "height": 10
+            "height": 9
           }
         },
         {
@@ -543,7 +570,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "56022a56",
+                  "datasetName": "6cee62b2",
                   "fields": [
                     {
                       "name": "status",
@@ -622,7 +649,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "56022a56",
+                  "datasetName": "6cee62b2",
                   "fields": [
                     {
                       "name": "countdistinct(designator)",
@@ -658,9 +685,9 @@
                 }
               },
               "frame": {
-                "title": "GTE Readiness",
+                "title": "Total Transport Fleet Readiness",
                 "showTitle": true,
-                "description": "Fully Operational\nTotal GTEs that are fully operational",
+                "description": "Fully Operational\n",
                 "showDescription": true
               }
             }
@@ -679,7 +706,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "56022a56",
+                  "datasetName": "6cee62b2",
                   "fields": [
                     {
                       "name": "count(*)",
@@ -700,14 +727,6 @@
               "encodings": {
                 "value": {
                   "fieldName": "sum(Status - Red)",
-                  "format": {
-                    "type": "number-plain",
-                    "abbreviation": "none",
-                    "decimalPlaces": {
-                      "type": "exact",
-                      "places": 0
-                    }
-                  },
                   "displayName": "Sum of Status - Red"
                 },
                 "target": {
@@ -716,9 +735,9 @@
                 }
               },
               "frame": {
-                "title": "GTE Readiness",
+                "title": "Total Transport Fleet Readiness",
                 "showTitle": true,
-                "description": "CASREP GTEs\nTotal number of predicted inoperable GTEs",
+                "description": "Inoperable\nTotal assets predicted inoperable",
                 "showDescription": true
               }
             }
@@ -735,7 +754,7 @@
             "name": "cab3f109",
             "multilineTextboxSpec": {
               "lines": [
-                "# Commanders Readiness Dashboard\n",
+                "# Executive's Asset Readiness Dashboard\n",
                 "\n",
                 "This dashboard provides an overview of the readiness of gas turbine engines on ships filterable by homeport. The chart shows the breakdown of engines that are operable, in need of maintenance, and inoperable. The parts analysis and supply routing table are filterable by part type"
               ]
@@ -746,6 +765,53 @@
             "y": 0,
             "width": 6,
             "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "8219f15e",
+            "queries": [
+              {
+                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_status",
+                "query": {
+                  "datasetName": "6cee62b2",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "status",
+                    "displayName": "status",
+                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_status"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Readiness - Status",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 6,
+            "width": 3,
+            "height": 1
           }
         }
       ],
@@ -762,7 +828,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "04bc5e97",
+                  "datasetName": "8a940a4b",
                   "fields": [
                     {
                       "name": "stock_location",
@@ -810,7 +876,7 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Stock Routing - Stock Location - Homport - Ship"
+                "title": "Stock Routing - Stock Location ->  Site -> Demand location"
               }
             }
           },
@@ -828,7 +894,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "a4f03de4",
+                  "datasetName": "66f9103e",
                   "fields": [
                     {
                       "name": "part",
@@ -874,6 +940,9 @@
                     "type": "categorical"
                   },
                   "displayName": "part"
+                },
+                "label": {
+                  "show": true
                 }
               },
               "frame": {
@@ -896,19 +965,27 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "04bc5e97",
+                  "datasetName": "8a940a4b",
                   "fields": [
+                    {
+                      "name": "qty_shipped",
+                      "expression": "`qty_shipped`"
+                    },
                     {
                       "name": "type",
                       "expression": "`type`"
+                    },
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
                     },
                     {
                       "name": "stock_location",
                       "expression": "`stock_location`"
                     },
                     {
-                      "name": "qty_shipped",
-                      "expression": "`qty_shipped`"
+                      "name": "home_location",
+                      "expression": "`home_location`"
                     }
                   ],
                   "disaggregated": true
@@ -920,60 +997,6 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {
-                    "fieldName": "type",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100001,
-                    "title": "type",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "type"
-                  },
-                  {
-                    "fieldName": "stock_location",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100002,
-                    "title": "stock_location",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "stock_location"
-                  },
                   {
                     "fieldName": "qty_shipped",
                     "numberFormat": "0",
@@ -992,70 +1015,131 @@
                     "type": "integer",
                     "displayAs": "number",
                     "visible": true,
-                    "order": 100003,
-                    "title": "qty_shipped",
+                    "order": 0,
+                    "title": "QTY",
                     "allowSearch": false,
-                    "alignContent": "right",
+                    "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
+                    "defaultColumnWidth": 70,
                     "displayName": "qty_shipped"
+                  },
+                  {
+                    "fieldName": "type",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "title": "type",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "defaultColumnWidth": 125,
+                    "displayName": "type"
+                  },
+                  {
+                    "fieldName": "designator",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 2,
+                    "title": "destination",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "defaultColumnWidth": 150,
+                    "displayName": "designator"
+                  },
+                  {
+                    "fieldName": "stock_location",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 3,
+                    "title": "stock_location",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "defaultColumnWidth": 125,
+                    "displayName": "stock_location"
+                  },
+                  {
+                    "fieldName": "home_location",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 4,
+                    "title": "home_location",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "home_location"
                   }
                 ]
               },
-              "invisibleColumns": [
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "designator",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 100003,
-                  "title": "designator",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "home_location",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 100004,
-                  "title": "home_location",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                }
-              ],
+              "invisibleColumns": [],
               "allowHTMLByDefault": false,
               "itemsPerPage": 25,
               "paginationSize": "default",
@@ -1081,11 +1165,9 @@
             "name": "eb6f59af",
             "multilineTextboxSpec": {
               "lines": [
-                "# Parts Management + Supply Chain Optimization \n",
+                "# Inventory Management + Logistics Optimization \n",
                 "\n",
-                "Based on our Predictive maintenance model and our stock status, we are able to provide recommendation to better organize our stock and potentially adjust spare parts command.  \n",
-                "\n",
-                "The potential use-cases and potential revenue optimizations are huge. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n"
+                "Based on our Predictive Maintenance model and our stock status, we are able to provide recommendation to better organize our stock, recommend shipment to minimize downtime, and adjust on-hand inventory.  \n"
               ]
             }
           },
@@ -1101,26 +1183,9 @@
             "name": "6f7c68af",
             "queries": [
               {
-                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bf37431be8aead71ec9ca25c2c_type",
+                "name": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14c483e8235c1b9c0d7a_part",
                 "query": {
-                  "datasetName": "04bc5e97",
-                  "fields": [
-                    {
-                      "name": "type",
-                      "expression": "`type`"
-                    },
-                    {
-                      "name": "type_associativity",
-                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bedcb019dd8b124dadf2a2012a_part",
-                "query": {
-                  "datasetName": "a4f03de4",
+                  "datasetName": "66f9103e",
                   "fields": [
                     {
                       "name": "part",
@@ -1133,36 +1198,52 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14f9be765c04fcfd7333_type",
+                "query": {
+                  "datasetName": "8a940a4b",
+                  "fields": [
+                    {
+                      "name": "type",
+                      "expression": "`type`"
+                    },
+                    {
+                      "name": "type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
               "version": 2,
-              "widgetType": "filter-single-select",
+              "widgetType": "filter-multi-select",
               "encodings": {
                 "fields": [
                   {
-                    "fieldName": "type",
-                    "displayName": "type",
-                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bf37431be8aead71ec9ca25c2c_type"
-                  },
-                  {
                     "fieldName": "part",
                     "displayName": "part",
-                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bedcb019dd8b124dadf2a2012a_part"
+                    "queryName": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14c483e8235c1b9c0d7a_part"
+                  },
+                  {
+                    "fieldName": "type",
+                    "displayName": "type",
+                    "queryName": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14f9be765c04fcfd7333_type"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
                 "title": "Component Type"
-              },
-              "disallowAll": false
+              }
             }
           },
           "position": {
             "x": 0,
             "y": 3,
-            "width": 6,
+            "width": 3,
             "height": 1
           }
         },
@@ -1173,8 +1254,12 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "a4f03de4",
+                  "datasetName": "66f9103e",
                   "fields": [
+                    {
+                      "name": "stock_location",
+                      "expression": "`stock_location`"
+                    },
                     {
                       "name": "part",
                       "expression": "`part`"
@@ -1197,6 +1282,34 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
+                  {
+                    "fieldName": "stock_location",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "stock_location",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "defaultColumnWidth": 125,
+                    "displayName": "stock_location"
+                  },
                   {
                     "fieldName": "part",
                     "booleanValues": [
@@ -1222,6 +1335,7 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
+                    "defaultColumnWidth": 100,
                     "displayName": "part"
                   },
                   {
@@ -1250,6 +1364,7 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
+                    "defaultColumnWidth": 80,
                     "displayName": "stock"
                   },
                   {
@@ -1278,6 +1393,7 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
+                    "defaultColumnWidth": 90,
                     "displayName": "deficit"
                   }
                 ]
@@ -1299,33 +1415,8 @@
                   "name": "home_location",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 100004,
+                  "order": 100003,
                   "title": "home_location",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "stock_location",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 100000,
-                  "title": "stock_location",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1353,6 +1444,75 @@
             "width": 3,
             "height": 8
           }
+        },
+        {
+          "widget": {
+            "name": "1da70113",
+            "queries": [
+              {
+                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541918885606d5c103ca65_home_location",
+                "query": {
+                  "datasetName": "f0a18247",
+                  "fields": [
+                    {
+                      "name": "home_location",
+                      "expression": "`home_location`"
+                    },
+                    {
+                      "name": "home_location_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418caaddb9db994f48d46_home_location",
+                "query": {
+                  "datasetName": "66f9103e",
+                  "fields": [
+                    {
+                      "name": "home_location",
+                      "expression": "`home_location`"
+                    },
+                    {
+                      "name": "home_location_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "home_location",
+                    "displayName": "home_location",
+                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541918885606d5c103ca65_home_location"
+                  },
+                  {
+                    "fieldName": "home_location",
+                    "displayName": "home_location",
+                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418caaddb9db994f48d46_home_location"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Stock Location"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 1
+          }
         }
       ],
       "pageType": "PAGE_TYPE_CANVAS"
@@ -1368,7 +1528,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "5b753ffe",
+                  "datasetName": "0aff856e",
                   "fields": [
                     {
                       "name": "fault",
@@ -1397,7 +1557,8 @@
                     "type": "categorical"
                   },
                   "axis": {
-                    "labelAngle": 45
+                    "labelAngle": 45,
+                    "hideLabels": false
                   },
                   "displayName": "designator"
                 },
@@ -1419,6 +1580,13 @@
                           "themeColorType": "visualizationColors",
                           "position": 4
                         }
+                      },
+                      {
+                        "value": "sensor_B",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 1
+                        }
                       }
                     ]
                   },
@@ -1431,6 +1599,50 @@
                   {
                     "fieldName": "turbine_id",
                     "displayName": "turbine_id"
+                  }
+                ]
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
                   }
                 ]
               }
@@ -1452,7 +1664,8 @@
                 "\n",
                 "Based on our Predictive maintenance model and our stock status, we are able to provide recommendation to better organize our stock and potentially adjust spare parts command.  \n",
                 "\n",
-                "The potential use-cases and potential revenue optimizations are huge. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n"
+                "The potential use-cases and A_o optimizations are vast. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n",
+                "\n"
               ]
             }
           },
@@ -1470,7 +1683,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "5b753ffe",
+                  "datasetName": "0aff856e",
                   "fields": [
                     {
                       "name": "fault",
@@ -1479,6 +1692,10 @@
                     {
                       "name": "turbine_id",
                       "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "designator",
+                      "expression": "`designator`"
                     }
                   ],
                   "disaggregated": true
@@ -1507,7 +1724,7 @@
                     "type": "string",
                     "displayAs": "string",
                     "visible": true,
-                    "order": 1,
+                    "order": 0,
                     "title": "fault",
                     "allowSearch": false,
                     "alignContent": "left",
@@ -1534,7 +1751,7 @@
                     "type": "string",
                     "displayAs": "string",
                     "visible": true,
-                    "order": 4,
+                    "order": 2,
                     "title": "turbine_id",
                     "allowSearch": false,
                     "alignContent": "left",
@@ -1543,6 +1760,33 @@
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
                     "displayName": "turbine_id"
+                  },
+                  {
+                    "fieldName": "designator",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 12,
+                    "title": "designator",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "displayName": "designator"
                   }
                 ]
               },
@@ -1564,7 +1808,7 @@
                   "name": "hourly_timestamp",
                   "type": "datetime",
                   "displayAs": "datetime",
-                  "order": 2,
+                  "order": 1,
                   "title": "hourly_timestamp",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -1589,7 +1833,7 @@
                   "name": "prediction",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 5,
+                  "order": 3,
                   "title": "prediction",
                   "allowSearch": false,
                   "alignContent": "left",
@@ -1599,6 +1843,7 @@
                   "preserveWhitespace": false
                 },
                 {
+                  "numberFormat": "0.00",
                   "booleanValues": [
                     "false",
                     "true"
@@ -1612,9 +1857,9 @@
                   "linkTitleTemplate": "{{ @ }}",
                   "linkOpenInNewTab": true,
                   "name": "lat",
-                  "type": "string",
+                  "type": "float",
                   "displayAs": "string",
-                  "order": 6,
+                  "order": 4,
                   "title": "lat",
                   "allowSearch": false,
                   "alignContent": "left",
@@ -1624,6 +1869,7 @@
                   "preserveWhitespace": false
                 },
                 {
+                  "numberFormat": "0.00",
                   "booleanValues": [
                     "false",
                     "true"
@@ -1637,9 +1883,9 @@
                   "linkTitleTemplate": "{{ @ }}",
                   "linkOpenInNewTab": true,
                   "name": "long",
-                  "type": "string",
+                  "type": "float",
                   "displayAs": "string",
-                  "order": 7,
+                  "order": 5,
                   "title": "long",
                   "allowSearch": false,
                   "alignContent": "left",
@@ -1664,7 +1910,7 @@
                   "name": "model",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 8,
+                  "order": 6,
                   "title": "model",
                   "allowSearch": false,
                   "alignContent": "left",
@@ -1689,8 +1935,33 @@
                   "name": "_rescued_data",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 9,
+                  "order": 7,
                   "title": "_rescued_data",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "maintenance",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 8,
+                  "title": "maintenance",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1714,7 +1985,7 @@
                   "name": "operable",
                   "type": "boolean",
                   "displayAs": "boolean",
-                  "order": 11,
+                  "order": 9,
                   "title": "operable",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -1740,7 +2011,7 @@
                   "name": "ttr",
                   "type": "float",
                   "displayAs": "number",
-                  "order": 12,
+                  "order": 10,
                   "title": "ttr",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -1762,11 +2033,11 @@
                   "linkTextTemplate": "{{ @ }}",
                   "linkTitleTemplate": "{{ @ }}",
                   "linkOpenInNewTab": true,
-                  "name": "designator",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 100003,
-                  "title": "designator",
+                  "name": "parts",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 11,
+                  "title": "parts",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1791,7 +2062,7 @@
                   "name": "designator_id",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 100004,
+                  "order": 13,
                   "title": "designator_id",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -1816,33 +2087,8 @@
                   "name": "home_location",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 100005,
+                  "order": 14,
                   "title": "home_location",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "maintenance_type",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 100011,
-                  "title": "maintenance_type",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1857,15 +2103,15 @@
               "condensed": true,
               "withRowNumber": false,
               "frame": {
-                "title": "Ship GTEs with Predicted Default",
+                "title": "Platform's with Predicted Faults",
                 "showTitle": true,
-                "description": "The following GTEs have a potential default should have maintenance conducted",
+                "description": "The following platforms have a potential default should have maintenance conducted",
                 "showDescription": true
               }
             }
           },
           "position": {
-            "x": 3,
+            "x": 0,
             "y": 11,
             "width": 3,
             "height": 5
@@ -1878,7 +2124,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "b03817ba",
+                  "datasetName": "4bf52947",
                   "fields": [
                     {
                       "name": "sum(num_faults)",
@@ -1899,10 +2145,10 @@
               "encodings": {
                 "angle": {
                   "fieldName": "sum(num_faults)",
+                  "displayName": "Faulty Parts by Percentage",
                   "scale": {
                     "type": "quantitative"
-                  },
-                  "displayName": "Faulty Parts by Percentage"
+                  }
                 },
                 "color": {
                   "fieldName": "type",
@@ -1968,7 +2214,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "5b753ffe",
+                  "datasetName": "0aff856e",
                   "fields": [
                     {
                       "name": "sum(ttr)",
@@ -1977,6 +2223,10 @@
                     {
                       "name": "turbine_id",
                       "expression": "`turbine_id`"
+                    },
+                    {
+                      "name": "fault",
+                      "expression": "`fault`"
                     },
                     {
                       "name": "designator",
@@ -2024,9 +2274,9 @@
                       "scheme": "reds"
                     },
                     "domain": {
-                      "max": 50,
-                      "min": 0
-                    }
+                      "max": 50
+                    },
+                    "reverse": false
                   },
                   "displayName": "Sum of ttr"
                 },
@@ -2037,6 +2287,10 @@
                   {
                     "fieldName": "turbine_id",
                     "displayName": "turbine_id"
+                  },
+                  {
+                    "fieldName": "fault",
+                    "displayName": "fault"
                   }
                 ]
               },
@@ -2058,9 +2312,9 @@
             "name": "aea00482",
             "queries": [
               {
-                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bec7cf18ccb14611252c0c5ea9_designator",
+                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee154187f85aba79feeefad93_designator",
                 "query": {
-                  "datasetName": "5b753ffe",
+                  "datasetName": "0aff856e",
                   "fields": [
                     {
                       "name": "designator",
@@ -2075,9 +2329,9 @@
                 }
               },
               {
-                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bef0971b459903230a81217308_designator",
+                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418efbe983d7d4656a84e_designator",
                 "query": {
-                  "datasetName": "e94523f9",
+                  "datasetName": "1124505b",
                   "fields": [
                     {
                       "name": "designator",
@@ -2100,12 +2354,12 @@
                   {
                     "fieldName": "designator",
                     "displayName": "designator",
-                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bec7cf18ccb14611252c0c5ea9_designator"
+                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee154187f85aba79feeefad93_designator"
                   },
                   {
                     "fieldName": "designator",
                     "displayName": "designator",
-                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bef0971b459903230a81217308_designator"
+                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418efbe983d7d4656a84e_designator"
                   }
                 ]
               },
@@ -2128,7 +2382,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "e94523f9",
+                  "datasetName": "1124505b",
                   "fields": [
                     {
                       "name": "turbine_id",
@@ -2141,6 +2395,11 @@
                     {
                       "name": "operable",
                       "expression": "`operable`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`designator` IN (`designator`) OR TRUE"
                     }
                   ],
                   "disaggregated": true
@@ -2338,6 +2597,31 @@
                   "preserveWhitespace": false
                 },
                 {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "maintenance",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 9,
+                  "title": "maintenance",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
                   "numberFormat": "0.00",
                   "booleanValues": [
                     "false",
@@ -2358,6 +2642,31 @@
                   "title": "ttr",
                   "allowSearch": false,
                   "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "parts",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 11,
+                  "title": "parts",
+                  "allowSearch": false,
+                  "alignContent": "left",
                   "allowHTML": false,
                   "highlightLinks": false,
                   "useMonospaceFont": false,
@@ -2490,31 +2799,6 @@
                   "highlightLinks": false,
                   "useMonospaceFont": false,
                   "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "maintenance_type",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 100009,
-                  "title": "maintenance_type",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
                 }
               ],
               "allowHTMLByDefault": false,
@@ -2525,13 +2809,13 @@
               "frame": {
                 "showTitle": true,
                 "showDescription": true,
-                "title": "Global turbine status",
+                "title": "Global platform status",
                 "description": "Status of all turbines both with and without faults"
               }
             }
           },
           "position": {
-            "x": 0,
+            "x": 3,
             "y": 11,
             "width": 3,
             "height": 5
@@ -2539,12 +2823,12 @@
         },
         {
           "widget": {
-            "name": "eb2c9934",
+            "name": "707dba5a",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "5b753ffe",
+                  "datasetName": "0aff856e",
                   "fields": [
                     {
                       "name": "count(maintenance_type)",
@@ -2582,10 +2866,8 @@
                 }
               },
               "frame": {
-                "showTitle": true,
-                "showDescription": true,
-                "title": "Maintenance Activity type Breakdown",
-                "description": "Level of maintenance activity"
+                "title": "Distribution of Maintenance Activity Types",
+                "showTitle": true
               }
             }
           },
@@ -2696,7 +2978,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "e94523f9",
+                  "datasetName": "1124505b",
                   "fields": [
                     {
                       "name": "model",
@@ -3973,7 +4255,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "e94523f9",
+                  "datasetName": "1124505b",
                   "fields": [
                     {
                       "name": "lat",
@@ -3984,12 +4266,17 @@
                       "expression": "`long`"
                     },
                     {
-                      "name": "designator",
-                      "expression": "`designator`"
+                      "name": "ship",
+                      "expression": "`ship`"
                     },
                     {
-                      "name": "home_location",
-                      "expression": "`home_location`"
+                      "name": "homeport",
+                      "expression": "`homeport`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`turbine_id` IN (`turbine_id`) OR TRUE"
                     }
                   ],
                   "disaggregated": true
@@ -4012,12 +4299,12 @@
                 },
                 "extra": [
                   {
-                    "fieldName": "designator",
-                    "displayName": "designator"
+                    "fieldName": "ship",
+                    "displayName": "ship"
                   },
                   {
-                    "fieldName": "home_location",
-                    "displayName": "home_location"
+                    "fieldName": "homeport",
+                    "displayName": "homeport"
                   }
                 ]
               }
@@ -4027,6 +4314,38 @@
             "x": 4,
             "y": 6,
             "width": 2,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "9f8166fc",
+      "displayName": "Untitled page",
+      "layout": [
+        {
+          "widget": {
+            "name": "d53835e6",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6cee62b2",
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {}
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
             "height": 6
           }
         }

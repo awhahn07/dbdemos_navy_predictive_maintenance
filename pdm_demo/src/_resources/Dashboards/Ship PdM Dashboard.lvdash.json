@@ -1,132 +1,6 @@
 {
   "datasets": [
     {
-      "name": "6cee62b2",
-      "displayName": "Ship GTE Readiness",
-      "queryLines": [
-        "SELECT designator, home_location, lat, long,\n",
-        "    CASE \n",
-        "        WHEN MAX(CASE WHEN operable = 'false' THEN 1 ELSE 0 END) >= 1 THEN 'red'\n",
-        "        WHEN COUNT(fault) >= 1 THEN 'yellow'\n",
-        "        ELSE 'green'\n",
-        "    END AS status \n",
-        "FROM ship_current_status_gold\n",
-        "GROUP BY ALL;"
-      ],
-      "columns": [
-        {
-          "displayName": "Status - Green",
-          "description": "",
-          "expression": "CASE\nWHEN status == 'green' THEN 1 \nELSE 0\nEND"
-        },
-        {
-          "displayName": "Status - Yellow",
-          "description": "",
-          "expression": "CASE\nWHEN status == 'yellow' THEN 1 ELSE 0\nEND"
-        },
-        {
-          "displayName": "Status - Red",
-          "description": "",
-          "expression": "CASE\nWHEN status == 'red' THEN 1 ELSE 0\nEND"
-        }
-      ],
-      "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy"
-    },
-    {
-      "name": "4bf52947",
-      "displayName": "Faulty Parts Count",
-      "queryLines": [
-        "SELECT COUNT(*) num_faults, p.type FROM ship_current_status_gold AS s\n",
-        "LEFT JOIN parts p\n",
-        "ON find_in_set(s.prediction, array_join(p.sensors, ',')) > 0\n",
-        "WHERE prediction != 'ok' AND type IS NOT NULL\n",
-        "GROUP BY ALL"
-      ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
-    },
-    {
-      "name": "0aff856e",
-      "displayName": "Ship GTE faulty",
-      "queryLines": [
-        "select * from ship_current_status_gold where prediction != 'ok'"
-      ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
-    },
-    {
-      "name": "66f9103e",
-      "displayName": "Stock Deficit by Location",
-      "queryLines": [
-        "WITH s AS (\n",
-        "    SELECT prediction, home_location, COUNT(*) num_faults\n",
-        "    FROM ship_current_status_gold\n",
-        "    GROUP BY prediction, home_location\n",
-        "), \n",
-        "p AS (\n",
-        "    SELECT stock_location, parts.type part, stock_available stock, \n",
-        "            CASE \n",
-        "                WHEN stock_location = 'FLC Norfolk' THEN 'NB Norfolk'\n",
-        "                WHEN stock_location = 'FLC Jacksonville' THEN 'NS Mayport'\n",
-        "                WHEN stock_location = 'FLC San Diego' THEN 'NB San Diego'\n",
-        "                WHEN stock_location = 'FLC Pearl Harbor' THEN 'NS Pearl Harbor'\n",
-        "                WHEN stock_location = 'FLC Puget Sound' THEN 'NB San Diego'\n",
-        "            END nearest_homeport\n",
-        "            , sensor  -- Include a new column to store the exploded sensor value\n",
-        "    FROM parts\n",
-        "    LATERAL VIEW explode(sensors) p_ex AS sensor\n",
-        ")\n",
-        "\n",
-        "SELECT p.stock_location, p.part, p.stock, s.home_location, (s.num_faults - p.stock) AS deficit\n",
-        "FROM s\n",
-        "LEFT JOIN p ON s.prediction = p.sensor AND p.nearest_homeport = s.home_location\n",
-        "WHERE (s.num_faults - p.stock) > 0 AND (s.num_faults - p.stock) IS NOT NULL;"
-      ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
-    },
-    {
-      "name": "1124505b",
-      "displayName": "ship_current_status_gold",
-      "queryLines": [
-        "SELECT * \n",
-        "EXCEPT (lat, long), \n",
-        "CAST(lat AS DOUBLE) AS lat, \n",
-        "CAST(long AS DOUBLE) AS long \n",
-        "FROM ship_current_status_gold"
-      ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
-    },
-    {
-      "name": "f0a18247",
-      "displayName": "Shipment with Homeports",
-      "queryLines": [
-        "WITH srn AS (\n",
-        "  SELECT \n",
-        "    REPLACE(designator, '_', ' ') AS designator, \n",
-        "    type, \n",
-        "    stock_location, \n",
-        "    qty_shipped \n",
-        "  FROM \n",
-        "    shipment_recommendations\n",
-        ")\n",
-        "SELECT \n",
-        "  srn.*, \n",
-        "  sm.home_location \n",
-        "FROM \n",
-        "  srn\n",
-        "JOIN \n",
-        "  ship_meta AS sm \n",
-        "ON \n",
-        "  sm.designator LIKE CONCAT('%', srn.designator, '%')\n",
-        "WHERE srn.qty_shipped > 0"
-      ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
-    },
-    {
       "name": "f261bf85",
       "displayName": "Current Turbine Status",
       "queryLines": [
@@ -146,18 +20,13 @@
         "  percentiles_sensor_D, \n",
         "  percentiles_sensor_E, \n",
         "  percentiles_sensor_F, \n",
-        "  country, \n",
         "  CAST(lat AS DOUBLE) AS lat, \n",
-        "  location, \n",
         "  CAST(long AS DOUBLE) AS long, \n",
-        "  model, \n",
-        "  state, \n",
-        "  _rescued_data, \n",
         "  prediction \n",
-        "FROM turbine_current_status;"
+        "FROM current_status_predictions;"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy_test"
     },
     {
       "name": "8f4e7b0e",
@@ -168,11 +37,122 @@
         "  * \n",
         "FROM sensor_bronze;"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy_test"
     },
     {
-      "name": "8a940a4b",
+      "name": "56022a56",
+      "displayName": "Ship GTE Readiness",
+      "queryLines": [
+        "-- SELECT designator, home_location, lat, long,\n",
+        "--     CASE \n",
+        "--         WHEN MAX(CASE WHEN operable = 'false' THEN 1 ELSE 0 END) >= 1 THEN 'red'\n",
+        "--         WHEN COUNT(prediction) >= 1 THEN 'yellow'\n",
+        "--         ELSE 'green'\n",
+        "--     END AS status \n",
+        "-- FROM ship_current_status_gold\n",
+        "-- GROUP BY ALL;\n",
+        "\n",
+        "SELECT\n",
+        "  turbine_id,\n",
+        "  designator,\n",
+        "  home_location,\n",
+        "  CASE\n",
+        "    WHEN prediction = 'ok' THEN 'green'\n",
+        "    WHEN prediction = 'sensor_F' THEN 'red'\n",
+        "    ELSE 'yellow'\n",
+        "  END AS status\n",
+        "FROM public_sector.predictive_maintenance_navy.ship_current_status_gold\n",
+        "QUALIFY hourly_timestamp = max(hourly_timestamp) OVER ()"
+      ],
+      "columns": [
+        {
+          "displayName": "Status - Green",
+          "description": "",
+          "expression": "CASE\nWHEN status == 'green' THEN 1 \nELSE 0\nEND"
+        },
+        {
+          "displayName": "Status - Yellow",
+          "description": "",
+          "expression": "CASE\nWHEN status == 'yellow' THEN 1 ELSE 0\nEND"
+        },
+        {
+          "displayName": "Status - Red",
+          "description": "",
+          "expression": "CASE\nWHEN status == 'red' THEN 1 ELSE 0\nEND"
+        }
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy_test"
+    },
+    {
+      "name": "b03817ba",
+      "displayName": "Faulty Parts Count",
+      "queryLines": [
+        "SELECT COUNT(*) num_faults, p.type FROM ship_current_status_gold AS s\n",
+        "LEFT JOIN parts_silver p\n",
+        "ON find_in_set(s.prediction, array_join(p.sensors, ',')) > 0\n",
+        "WHERE prediction != 'ok' AND type IS NOT NULL\n",
+        "GROUP BY ALL"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy_test"
+    },
+    {
+      "name": "5b753ffe",
+      "displayName": "Ship GTE faulty",
+      "queryLines": [
+        "select * from ship_current_status_gold where prediction != 'ok'"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "a4f03de4",
+      "displayName": "Stock Deficit by Location",
+      "queryLines": [
+        "WITH s AS (\n",
+        "    SELECT prediction, home_location, COUNT(*) num_faults\n",
+        "    FROM ship_current_status_gold\n",
+        "    GROUP BY prediction, home_location\n",
+        "), \n",
+        "p AS (\n",
+        "    SELECT stock_location, parts_silver.type part, inventory_level stock, \n",
+        "            CASE \n",
+        "                WHEN stock_location = 'FLC Norfolk' THEN 'NB Norfolk'\n",
+        "                WHEN stock_location = 'FLC Jacksonville' THEN 'NS Mayport'\n",
+        "                WHEN stock_location = 'FLC San Diego' THEN 'NB San Diego'\n",
+        "                WHEN stock_location = 'FLC Pearl Harbor' THEN 'NS Pearl Harbor'\n",
+        "                WHEN stock_location = 'FLC Puget Sound' THEN 'NB San Diego'\n",
+        "            END nearest_homeport\n",
+        "            , sensor  -- Include a new column to store the exploded sensor value\n",
+        "    FROM parts_silver\n",
+        "    LATERAL VIEW explode(sensors) p_ex AS sensor\n",
+        ")\n",
+        "\n",
+        "SELECT p.stock_location, p.part, p.stock, s.home_location, (s.num_faults - p.stock) AS deficit\n",
+        "FROM s\n",
+        "LEFT JOIN p ON s.prediction = p.sensor AND p.nearest_homeport = s.home_location\n",
+        "WHERE (s.num_faults - p.stock) > 0 AND (s.num_faults - p.stock) IS NOT NULL;"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "e94523f9",
+      "displayName": "ship_current_status_gold",
+      "queryLines": [
+        "SELECT * \n",
+        "EXCEPT (lat, long), \n",
+        "CAST(lat AS DOUBLE) AS lat, \n",
+        "CAST(long AS DOUBLE) AS long \n",
+        "FROM ship_current_status_gold"
+      ],
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
+    },
+    {
+      "name": "04bc5e97",
       "displayName": "Shipment with Home Location",
       "queryLines": [
         "WITH homes AS (\n",
@@ -184,8 +164,8 @@
         "JOIN homes ON shipment_recommendations.designator = homes.designator\n",
         "WHERE qty_shipped > 0"
       ],
-      "catalog": "ahahn_demo",
-      "schema": "dbdemos_pubsec_pdm"
+      "catalog": "public_sector",
+      "schema": "predictive_maintenance_navy"
     }
   ],
   "pages": [
@@ -198,9 +178,9 @@
             "name": "083e90b2",
             "queries": [
               {
-                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_home_location",
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bdee621e63a83fd17011af8df8_home_location",
                 "query": {
-                  "datasetName": "6cee62b2",
+                  "datasetName": "56022a56",
                   "fields": [
                     {
                       "name": "home_location",
@@ -217,18 +197,18 @@
             ],
             "spec": {
               "version": 2,
-              "widgetType": "filter-multi-select",
+              "widgetType": "filter-single-select",
               "encodings": {
                 "fields": [
                   {
                     "fieldName": "home_location",
                     "displayName": "home_location",
-                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_home_location"
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bdee621e63a83fd17011af8df8_home_location"
                   }
                 ]
               },
               "frame": {
-                "title": "Readiness - Site",
+                "title": "Readiness - Homeport",
                 "showTitle": true
               }
             }
@@ -247,11 +227,11 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "6cee62b2",
+                  "datasetName": "56022a56",
                   "fields": [
                     {
-                      "name": "count(*)",
-                      "expression": "COUNT(`*`)"
+                      "name": "countdistinct(turbine_id)",
+                      "expression": "COUNT(DISTINCT `turbine_id`)"
                     },
                     {
                       "name": "avg(Status - Yellow)",
@@ -278,14 +258,14 @@
                   "displayName": "Average Status - Yellow"
                 },
                 "target": {
-                  "fieldName": "count(*)",
+                  "fieldName": "countdistinct(turbine_id)",
                   "displayName": "Count of Records"
                 }
               },
               "frame": {
-                "title": "Total Transport Fleet Readiness",
+                "title": "GTE Readiness",
                 "showTitle": true,
-                "description": "Need Maintenance\nTotal assets predicted to require maintenance",
+                "description": "Need Maintenance\nTotal fleet GTEs predicted to require maintenance",
                 "showDescription": true
               }
             }
@@ -304,7 +284,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "6cee62b2",
+                  "datasetName": "56022a56",
                   "fields": [
                     {
                       "name": "designator",
@@ -313,10 +293,6 @@
                     {
                       "name": "status",
                       "expression": "`status`"
-                    },
-                    {
-                      "name": "home_location",
-                      "expression": "`home_location`"
                     }
                   ],
                   "disaggregated": true
@@ -352,8 +328,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "designator"
+                    "preserveWhitespace": false
                   },
                   {
                     "fieldName": "status",
@@ -379,91 +354,11 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "status"
-                  },
-                  {
-                    "fieldName": "home_location",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 4,
-                    "title": "home_location",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "home_location"
+                    "preserveWhitespace": false
                   }
                 ]
               },
               "invisibleColumns": [
-                {
-                  "numberFormat": "0.00",
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "lat",
-                  "type": "float",
-                  "displayAs": "string",
-                  "order": 2,
-                  "title": "lat",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "numberFormat": "0.00",
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "long",
-                  "type": "float",
-                  "displayAs": "string",
-                  "order": 3,
-                  "title": "long",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
                 {
                   "numberFormat": "0",
                   "booleanValues": [
@@ -481,7 +376,7 @@
                   "name": "Status - Green",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 100005,
+                  "order": 5,
                   "title": "Status - Green",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -507,7 +402,7 @@
                   "name": "Status - Yellow",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 100006,
+                  "order": 6,
                   "title": "Status - Yellow",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -533,10 +428,35 @@
                   "name": "Status - Red",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 100007,
+                  "order": 7,
                   "title": "Status - Red",
                   "allowSearch": false,
                   "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "turbine_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100000,
+                  "title": "turbine_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
                   "allowHTML": false,
                   "highlightLinks": false,
                   "useMonospaceFont": false,
@@ -549,18 +469,18 @@
               "condensed": true,
               "withRowNumber": false,
               "frame": {
-                "title": "Readiness Status by Platform",
+                "title": "Readiness by ship",
                 "showTitle": true,
-                "description": "Readiness status - filterable by site\n",
+                "description": "Readiness status by ship - filterable by homeport\n",
                 "showDescription": true
               }
             }
           },
           "position": {
             "x": 3,
-            "y": 7,
+            "y": 6,
             "width": 3,
-            "height": 9
+            "height": 10
           }
         },
         {
@@ -570,7 +490,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "6cee62b2",
+                  "datasetName": "56022a56",
                   "fields": [
                     {
                       "name": "status",
@@ -649,11 +569,11 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "6cee62b2",
+                  "datasetName": "56022a56",
                   "fields": [
                     {
-                      "name": "countdistinct(designator)",
-                      "expression": "COUNT(DISTINCT `designator`)"
+                      "name": "countdistinct(turbine_id)",
+                      "expression": "COUNT(DISTINCT `turbine_id`)"
                     },
                     {
                       "name": "avg(Status - Green)",
@@ -680,14 +600,14 @@
                   "displayName": "Average Status - Green"
                 },
                 "target": {
-                  "fieldName": "countdistinct(designator)",
+                  "fieldName": "countdistinct(turbine_id)",
                   "displayName": "Count of Unique designator"
                 }
               },
               "frame": {
-                "title": "Total Transport Fleet Readiness",
+                "title": "GTE Readiness",
                 "showTitle": true,
-                "description": "Fully Operational\n",
+                "description": "Fully Operational\nTotal GTEs that are fully operational",
                 "showDescription": true
               }
             }
@@ -706,11 +626,11 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "6cee62b2",
+                  "datasetName": "56022a56",
                   "fields": [
                     {
-                      "name": "count(*)",
-                      "expression": "COUNT(`*`)"
+                      "name": "countdistinct(turbine_id)",
+                      "expression": "COUNT(DISTINCT `turbine_id`)"
                     },
                     {
                       "name": "sum(Status - Red)",
@@ -727,17 +647,25 @@
               "encodings": {
                 "value": {
                   "fieldName": "sum(Status - Red)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 0
+                    }
+                  },
                   "displayName": "Sum of Status - Red"
                 },
                 "target": {
-                  "fieldName": "count(*)",
+                  "fieldName": "countdistinct(turbine_id)",
                   "displayName": "Count of Records"
                 }
               },
               "frame": {
-                "title": "Total Transport Fleet Readiness",
+                "title": "GTE Readiness",
                 "showTitle": true,
-                "description": "Inoperable\nTotal assets predicted inoperable",
+                "description": "CASREP GTEs\nTotal number of predicted inoperable GTEs",
                 "showDescription": true
               }
             }
@@ -754,7 +682,7 @@
             "name": "cab3f109",
             "multilineTextboxSpec": {
               "lines": [
-                "# Executive's Asset Readiness Dashboard\n",
+                "# Commanders Readiness Dashboard\n",
                 "\n",
                 "This dashboard provides an overview of the readiness of gas turbine engines on ships filterable by homeport. The chart shows the breakdown of engines that are operable, in need of maintenance, and inoperable. The parts analysis and supply routing table are filterable by part type"
               ]
@@ -765,53 +693,6 @@
             "y": 0,
             "width": 6,
             "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "8219f15e",
-            "queries": [
-              {
-                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_status",
-                "query": {
-                  "datasetName": "6cee62b2",
-                  "fields": [
-                    {
-                      "name": "status",
-                      "expression": "`status`"
-                    },
-                    {
-                      "name": "status_associativity",
-                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "status",
-                    "displayName": "status",
-                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541848a6d0a0d4055d9e68_status"
-                  }
-                ]
-              },
-              "frame": {
-                "title": "Readiness - Status",
-                "showTitle": true
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 6,
-            "width": 3,
-            "height": 1
           }
         }
       ],
@@ -828,7 +709,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "8a940a4b",
+                  "datasetName": "04bc5e97",
                   "fields": [
                     {
                       "name": "stock_location",
@@ -876,7 +757,7 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Stock Routing - Stock Location ->  Site -> Demand location"
+                "title": "Stock Routing - Stock Location - Homport - Ship"
               }
             }
           },
@@ -894,7 +775,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "66f9103e",
+                  "datasetName": "a4f03de4",
                   "fields": [
                     {
                       "name": "part",
@@ -940,9 +821,6 @@
                     "type": "categorical"
                   },
                   "displayName": "part"
-                },
-                "label": {
-                  "show": true
                 }
               },
               "frame": {
@@ -965,27 +843,19 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "8a940a4b",
+                  "datasetName": "04bc5e97",
                   "fields": [
-                    {
-                      "name": "qty_shipped",
-                      "expression": "`qty_shipped`"
-                    },
                     {
                       "name": "type",
                       "expression": "`type`"
-                    },
-                    {
-                      "name": "designator",
-                      "expression": "`designator`"
                     },
                     {
                       "name": "stock_location",
                       "expression": "`stock_location`"
                     },
                     {
-                      "name": "home_location",
-                      "expression": "`home_location`"
+                      "name": "qty_shipped",
+                      "expression": "`qty_shipped`"
                     }
                   ],
                   "disaggregated": true
@@ -997,35 +867,6 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {
-                    "fieldName": "qty_shipped",
-                    "numberFormat": "0",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "integer",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 0,
-                    "title": "QTY",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "defaultColumnWidth": 70,
-                    "displayName": "qty_shipped"
-                  },
                   {
                     "fieldName": "type",
                     "booleanValues": [
@@ -1043,7 +884,7 @@
                     "type": "string",
                     "displayAs": "string",
                     "visible": true,
-                    "order": 1,
+                    "order": 100001,
                     "title": "type",
                     "allowSearch": false,
                     "alignContent": "left",
@@ -1051,36 +892,7 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
-                    "defaultColumnWidth": 125,
                     "displayName": "type"
-                  },
-                  {
-                    "fieldName": "designator",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 2,
-                    "title": "destination",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "defaultColumnWidth": 150,
-                    "displayName": "designator"
                   },
                   {
                     "fieldName": "stock_location",
@@ -1099,7 +911,7 @@
                     "type": "string",
                     "displayAs": "string",
                     "visible": true,
-                    "order": 3,
+                    "order": 100002,
                     "title": "stock_location",
                     "allowSearch": false,
                     "alignContent": "left",
@@ -1107,11 +919,11 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
-                    "defaultColumnWidth": 125,
                     "displayName": "stock_location"
                   },
                   {
-                    "fieldName": "home_location",
+                    "fieldName": "qty_shipped",
+                    "numberFormat": "0",
                     "booleanValues": [
                       "false",
                       "true"
@@ -1124,22 +936,73 @@
                     "linkTextTemplate": "{{ @ }}",
                     "linkTitleTemplate": "{{ @ }}",
                     "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
+                    "type": "integer",
+                    "displayAs": "number",
                     "visible": true,
-                    "order": 4,
-                    "title": "home_location",
+                    "order": 100003,
+                    "title": "qty_shipped",
                     "allowSearch": false,
-                    "alignContent": "left",
+                    "alignContent": "right",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
-                    "displayName": "home_location"
+                    "displayName": "qty_shipped"
                   }
                 ]
               },
-              "invisibleColumns": [],
+              "invisibleColumns": [
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "designator",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100003,
+                  "title": "designator",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100004,
+                  "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
               "allowHTMLByDefault": false,
               "itemsPerPage": 25,
               "paginationSize": "default",
@@ -1165,9 +1028,11 @@
             "name": "eb6f59af",
             "multilineTextboxSpec": {
               "lines": [
-                "# Inventory Management + Logistics Optimization \n",
+                "# Parts Management + Supply Chain Optimization \n",
                 "\n",
-                "Based on our Predictive Maintenance model and our stock status, we are able to provide recommendation to better organize our stock, recommend shipment to minimize downtime, and adjust on-hand inventory.  \n"
+                "Based on our Predictive maintenance model and our stock status, we are able to provide recommendation to better organize our stock and potentially adjust spare parts command.  \n",
+                "\n",
+                "The potential use-cases and potential revenue optimizations are huge. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n"
               ]
             }
           },
@@ -1183,26 +1048,9 @@
             "name": "6f7c68af",
             "queries": [
               {
-                "name": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14c483e8235c1b9c0d7a_part",
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bf37431be8aead71ec9ca25c2c_type",
                 "query": {
-                  "datasetName": "66f9103e",
-                  "fields": [
-                    {
-                      "name": "part",
-                      "expression": "`part`"
-                    },
-                    {
-                      "name": "part_associativity",
-                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14f9be765c04fcfd7333_type",
-                "query": {
-                  "datasetName": "8a940a4b",
+                  "datasetName": "04bc5e97",
                   "fields": [
                     {
                       "name": "type",
@@ -1215,35 +1063,53 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bedcb019dd8b124dadf2a2012a_part",
+                "query": {
+                  "datasetName": "a4f03de4",
+                  "fields": [
+                    {
+                      "name": "part",
+                      "expression": "`part`"
+                    },
+                    {
+                      "name": "part_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
               "version": 2,
-              "widgetType": "filter-multi-select",
+              "widgetType": "filter-single-select",
               "encodings": {
                 "fields": [
                   {
-                    "fieldName": "part",
-                    "displayName": "part",
-                    "queryName": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14c483e8235c1b9c0d7a_part"
-                  },
-                  {
                     "fieldName": "type",
                     "displayName": "type",
-                    "queryName": "dashboards/01f068bce09e1c689fa25b66d73296b9/datasets/01f068bce09f14f9be765c04fcfd7333_type"
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bf37431be8aead71ec9ca25c2c_type"
+                  },
+                  {
+                    "fieldName": "part",
+                    "displayName": "part",
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bedcb019dd8b124dadf2a2012a_part"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
                 "title": "Component Type"
-              }
+              },
+              "disallowAll": false
             }
           },
           "position": {
             "x": 0,
             "y": 3,
-            "width": 3,
+            "width": 6,
             "height": 1
           }
         },
@@ -1254,12 +1120,8 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "66f9103e",
+                  "datasetName": "a4f03de4",
                   "fields": [
-                    {
-                      "name": "stock_location",
-                      "expression": "`stock_location`"
-                    },
                     {
                       "name": "part",
                       "expression": "`part`"
@@ -1282,34 +1144,6 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {
-                    "fieldName": "stock_location",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100000,
-                    "title": "stock_location",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "defaultColumnWidth": 125,
-                    "displayName": "stock_location"
-                  },
                   {
                     "fieldName": "part",
                     "booleanValues": [
@@ -1335,7 +1169,6 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
-                    "defaultColumnWidth": 100,
                     "displayName": "part"
                   },
                   {
@@ -1364,7 +1197,6 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
-                    "defaultColumnWidth": 80,
                     "displayName": "stock"
                   },
                   {
@@ -1393,7 +1225,6 @@
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false,
-                    "defaultColumnWidth": 90,
                     "displayName": "deficit"
                   }
                 ]
@@ -1415,8 +1246,33 @@
                   "name": "home_location",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 100003,
+                  "order": 100004,
                   "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "stock_location",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100000,
+                  "title": "stock_location",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1444,75 +1300,6 @@
             "width": 3,
             "height": 8
           }
-        },
-        {
-          "widget": {
-            "name": "1da70113",
-            "queries": [
-              {
-                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541918885606d5c103ca65_home_location",
-                "query": {
-                  "datasetName": "f0a18247",
-                  "fields": [
-                    {
-                      "name": "home_location",
-                      "expression": "`home_location`"
-                    },
-                    {
-                      "name": "home_location_associativity",
-                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418caaddb9db994f48d46_home_location",
-                "query": {
-                  "datasetName": "66f9103e",
-                  "fields": [
-                    {
-                      "name": "home_location",
-                      "expression": "`home_location`"
-                    },
-                    {
-                      "name": "home_location_associativity",
-                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "home_location",
-                    "displayName": "home_location",
-                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee1541918885606d5c103ca65_home_location"
-                  },
-                  {
-                    "fieldName": "home_location",
-                    "displayName": "home_location",
-                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418caaddb9db994f48d46_home_location"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Stock Location"
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 3,
-            "width": 3,
-            "height": 1
-          }
         }
       ],
       "pageType": "PAGE_TYPE_CANVAS"
@@ -1528,11 +1315,11 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "0aff856e",
+                  "datasetName": "5b753ffe",
                   "fields": [
                     {
-                      "name": "fault",
-                      "expression": "`fault`"
+                      "name": "prediction",
+                      "expression": "`prediction`"
                     },
                     {
                       "name": "turbine_id",
@@ -1557,20 +1344,19 @@
                     "type": "categorical"
                   },
                   "axis": {
-                    "labelAngle": 45,
-                    "hideLabels": false
+                    "labelAngle": 45
                   },
                   "displayName": "designator"
                 },
                 "y": {
-                  "fieldName": "fault",
+                  "fieldName": "prediction",
                   "scale": {
                     "type": "categorical"
                   },
                   "displayName": "fault"
                 },
                 "color": {
-                  "fieldName": "fault",
+                  "fieldName": "prediction",
                   "scale": {
                     "type": "categorical",
                     "mappings": [
@@ -1579,13 +1365,6 @@
                         "color": {
                           "themeColorType": "visualizationColors",
                           "position": 4
-                        }
-                      },
-                      {
-                        "value": "sensor_B",
-                        "color": {
-                          "themeColorType": "visualizationColors",
-                          "position": 1
                         }
                       }
                     ]
@@ -1599,50 +1378,6 @@
                   {
                     "fieldName": "turbine_id",
                     "displayName": "turbine_id"
-                  }
-                ]
-              },
-              "mark": {
-                "colors": [
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 2
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 2
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 3
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 4
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 5
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 6
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 7
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 8
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 9
-                  },
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 10
                   }
                 ]
               }
@@ -1664,8 +1399,7 @@
                 "\n",
                 "Based on our Predictive maintenance model and our stock status, we are able to provide recommendation to better organize our stock and potentially adjust spare parts command.  \n",
                 "\n",
-                "The potential use-cases and A_o optimizations are vast. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n",
-                "\n"
+                "The potential use-cases and potential revenue optimizations are huge. As other example we can also run analysis on the faulty equipment history and potentially detect frequent issues to take preventive action on the hardware.\n"
               ]
             }
           },
@@ -1683,19 +1417,11 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "0aff856e",
+                  "datasetName": "5b753ffe",
                   "fields": [
-                    {
-                      "name": "fault",
-                      "expression": "`fault`"
-                    },
                     {
                       "name": "turbine_id",
                       "expression": "`turbine_id`"
-                    },
-                    {
-                      "name": "designator",
-                      "expression": "`designator`"
                     }
                   ],
                   "disaggregated": true
@@ -1707,33 +1433,6 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {
-                    "fieldName": "fault",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 0,
-                    "title": "fault",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "fault"
-                  },
                   {
                     "fieldName": "turbine_id",
                     "booleanValues": [
@@ -1751,42 +1450,14 @@
                     "type": "string",
                     "displayAs": "string",
                     "visible": true,
-                    "order": 2,
+                    "order": 4,
                     "title": "turbine_id",
                     "allowSearch": false,
                     "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "turbine_id"
-                  },
-                  {
-                    "fieldName": "designator",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 12,
-                    "title": "designator",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "designator"
+                    "preserveWhitespace": false
                   }
                 ]
               },
@@ -1808,7 +1479,7 @@
                   "name": "hourly_timestamp",
                   "type": "datetime",
                   "displayAs": "datetime",
-                  "order": 1,
+                  "order": 2,
                   "title": "hourly_timestamp",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -1833,7 +1504,7 @@
                   "name": "prediction",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 3,
+                  "order": 5,
                   "title": "prediction",
                   "allowSearch": false,
                   "alignContent": "left",
@@ -1843,7 +1514,6 @@
                   "preserveWhitespace": false
                 },
                 {
-                  "numberFormat": "0.00",
                   "booleanValues": [
                     "false",
                     "true"
@@ -1857,9 +1527,9 @@
                   "linkTitleTemplate": "{{ @ }}",
                   "linkOpenInNewTab": true,
                   "name": "lat",
-                  "type": "float",
+                  "type": "string",
                   "displayAs": "string",
-                  "order": 4,
+                  "order": 6,
                   "title": "lat",
                   "allowSearch": false,
                   "alignContent": "left",
@@ -1869,7 +1539,6 @@
                   "preserveWhitespace": false
                 },
                 {
-                  "numberFormat": "0.00",
                   "booleanValues": [
                     "false",
                     "true"
@@ -1883,85 +1552,10 @@
                   "linkTitleTemplate": "{{ @ }}",
                   "linkOpenInNewTab": true,
                   "name": "long",
-                  "type": "float",
-                  "displayAs": "string",
-                  "order": 5,
-                  "title": "long",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "model",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 6,
-                  "title": "model",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "_rescued_data",
                   "type": "string",
                   "displayAs": "string",
                   "order": 7,
-                  "title": "_rescued_data",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "maintenance",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 8,
-                  "title": "maintenance",
+                  "title": "long",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -1985,7 +1579,7 @@
                   "name": "operable",
                   "type": "boolean",
                   "displayAs": "boolean",
-                  "order": 9,
+                  "order": 11,
                   "title": "operable",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -2011,7 +1605,7 @@
                   "name": "ttr",
                   "type": "float",
                   "displayAs": "number",
-                  "order": 10,
+                  "order": 12,
                   "title": "ttr",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -2033,11 +1627,11 @@
                   "linkTextTemplate": "{{ @ }}",
                   "linkTitleTemplate": "{{ @ }}",
                   "linkOpenInNewTab": true,
-                  "name": "parts",
-                  "type": "complex",
-                  "displayAs": "json",
-                  "order": 11,
-                  "title": "parts",
+                  "name": "designator",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100003,
+                  "title": "designator",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -2062,7 +1656,7 @@
                   "name": "designator_id",
                   "type": "integer",
                   "displayAs": "number",
-                  "order": 13,
+                  "order": 100004,
                   "title": "designator_id",
                   "allowSearch": false,
                   "alignContent": "right",
@@ -2087,8 +1681,390 @@
                   "name": "home_location",
                   "type": "string",
                   "displayAs": "string",
-                  "order": 14,
+                  "order": 100005,
                   "title": "home_location",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "maintenance_type",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100011,
+                  "title": "maintenance_type",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "avg_energy",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100002,
+                  "title": "avg_energy",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_A",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100003,
+                  "title": "std_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_B",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100004,
+                  "title": "std_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_C",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100005,
+                  "title": "std_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_D",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100006,
+                  "title": "std_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_E",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100007,
+                  "title": "std_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_F",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100008,
+                  "title": "std_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_A",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100009,
+                  "title": "percentiles_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_B",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100010,
+                  "title": "percentiles_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_C",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100011,
+                  "title": "percentiles_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_D",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100012,
+                  "title": "percentiles_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_E",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100013,
+                  "title": "percentiles_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_F",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100014,
+                  "title": "percentiles_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100020,
+                  "title": "home_location_id",
                   "allowSearch": false,
                   "alignContent": "left",
                   "allowHTML": false,
@@ -2103,15 +2079,15 @@
               "condensed": true,
               "withRowNumber": false,
               "frame": {
-                "title": "Platform's with Predicted Faults",
+                "title": "Ship GTEs with Predicted Default",
                 "showTitle": true,
-                "description": "The following platforms have a potential default should have maintenance conducted",
+                "description": "The following GTEs have a potential default should have maintenance conducted",
                 "showDescription": true
               }
             }
           },
           "position": {
-            "x": 0,
+            "x": 3,
             "y": 11,
             "width": 3,
             "height": 5
@@ -2124,7 +2100,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "4bf52947",
+                  "datasetName": "b03817ba",
                   "fields": [
                     {
                       "name": "sum(num_faults)",
@@ -2145,10 +2121,10 @@
               "encodings": {
                 "angle": {
                   "fieldName": "sum(num_faults)",
-                  "displayName": "Faulty Parts by Percentage",
                   "scale": {
                     "type": "quantitative"
-                  }
+                  },
+                  "displayName": "Faulty Parts by Percentage"
                 },
                 "color": {
                   "fieldName": "type",
@@ -2214,7 +2190,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "0aff856e",
+                  "datasetName": "5b753ffe",
                   "fields": [
                     {
                       "name": "sum(ttr)",
@@ -2223,10 +2199,6 @@
                     {
                       "name": "turbine_id",
                       "expression": "`turbine_id`"
-                    },
-                    {
-                      "name": "fault",
-                      "expression": "`fault`"
                     },
                     {
                       "name": "designator",
@@ -2274,9 +2246,9 @@
                       "scheme": "reds"
                     },
                     "domain": {
-                      "max": 50
-                    },
-                    "reverse": false
+                      "max": 50,
+                      "min": 0
+                    }
                   },
                   "displayName": "Sum of ttr"
                 },
@@ -2287,10 +2259,6 @@
                   {
                     "fieldName": "turbine_id",
                     "displayName": "turbine_id"
-                  },
-                  {
-                    "fieldName": "fault",
-                    "displayName": "fault"
                   }
                 ]
               },
@@ -2312,9 +2280,9 @@
             "name": "aea00482",
             "queries": [
               {
-                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee154187f85aba79feeefad93_designator",
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bec7cf18ccb14611252c0c5ea9_designator",
                 "query": {
-                  "datasetName": "0aff856e",
+                  "datasetName": "5b753ffe",
                   "fields": [
                     {
                       "name": "designator",
@@ -2329,9 +2297,9 @@
                 }
               },
               {
-                "name": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418efbe983d7d4656a84e_designator",
+                "name": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bef0971b459903230a81217308_designator",
                 "query": {
-                  "datasetName": "1124505b",
+                  "datasetName": "e94523f9",
                   "fields": [
                     {
                       "name": "designator",
@@ -2354,12 +2322,12 @@
                   {
                     "fieldName": "designator",
                     "displayName": "designator",
-                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee154187f85aba79feeefad93_designator"
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bec7cf18ccb14611252c0c5ea9_designator"
                   },
                   {
                     "fieldName": "designator",
                     "displayName": "designator",
-                    "queryName": "dashboards/01f063eee154119f99b398347430eb90/datasets/01f063eee15418efbe983d7d4656a84e_designator"
+                    "queryName": "dashboards/01f068bce0781850b4f2e5a76f758b33/datasets/01f068bef0971b459903230a81217308_designator"
                   }
                 ]
               },
@@ -2382,24 +2350,15 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "1124505b",
+                  "datasetName": "e94523f9",
                   "fields": [
                     {
                       "name": "turbine_id",
                       "expression": "`turbine_id`"
                     },
                     {
-                      "name": "fault",
-                      "expression": "`fault`"
-                    },
-                    {
                       "name": "operable",
                       "expression": "`operable`"
-                    }
-                  ],
-                  "filters": [
-                    {
-                      "expression": "`designator` IN (`designator`) OR TRUE"
                     }
                   ],
                   "disaggregated": true
@@ -2435,35 +2394,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "turbine_id"
-                  },
-                  {
-                    "fieldName": "fault",
-                    "booleanValues": [
-                      "false",
-                      "true"
-                    ],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 2,
-                    "title": "fault",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "fault"
+                    "preserveWhitespace": false
                   },
                   {
                     "fieldName": "operable",
@@ -2489,8 +2420,7 @@
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "displayName": "operable"
+                    "preserveWhitespace": false
                   }
                 ]
               },
@@ -2547,81 +2477,6 @@
                   "preserveWhitespace": false
                 },
                 {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "model",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 7,
-                  "title": "model",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "_rescued_data",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 8,
-                  "title": "_rescued_data",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "maintenance",
-                  "type": "string",
-                  "displayAs": "string",
-                  "order": 9,
-                  "title": "maintenance",
-                  "allowSearch": false,
-                  "alignContent": "left",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
                   "numberFormat": "0.00",
                   "booleanValues": [
                     "false",
@@ -2642,31 +2497,6 @@
                   "title": "ttr",
                   "allowSearch": false,
                   "alignContent": "right",
-                  "allowHTML": false,
-                  "highlightLinks": false,
-                  "useMonospaceFont": false,
-                  "preserveWhitespace": false
-                },
-                {
-                  "booleanValues": [
-                    "false",
-                    "true"
-                  ],
-                  "imageUrlTemplate": "{{ @ }}",
-                  "imageTitleTemplate": "{{ @ }}",
-                  "imageWidth": "",
-                  "imageHeight": "",
-                  "linkUrlTemplate": "{{ @ }}",
-                  "linkTextTemplate": "{{ @ }}",
-                  "linkTitleTemplate": "{{ @ }}",
-                  "linkOpenInNewTab": true,
-                  "name": "parts",
-                  "type": "complex",
-                  "displayAs": "json",
-                  "order": 11,
-                  "title": "parts",
-                  "allowSearch": false,
-                  "alignContent": "left",
                   "allowHTML": false,
                   "highlightLinks": false,
                   "useMonospaceFont": false,
@@ -2799,6 +2629,388 @@
                   "highlightLinks": false,
                   "useMonospaceFont": false,
                   "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "maintenance_type",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100009,
+                  "title": "maintenance_type",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "avg_energy",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100002,
+                  "title": "avg_energy",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_A",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100003,
+                  "title": "std_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_B",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100004,
+                  "title": "std_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_C",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100005,
+                  "title": "std_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_D",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100006,
+                  "title": "std_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_E",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100007,
+                  "title": "std_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "std_sensor_F",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100008,
+                  "title": "std_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_A",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100009,
+                  "title": "percentiles_sensor_A",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_B",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100010,
+                  "title": "percentiles_sensor_B",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_C",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100011,
+                  "title": "percentiles_sensor_C",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_D",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100012,
+                  "title": "percentiles_sensor_D",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_E",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100013,
+                  "title": "percentiles_sensor_E",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "percentiles_sensor_F",
+                  "type": "complex",
+                  "displayAs": "json",
+                  "order": 100014,
+                  "title": "percentiles_sensor_F",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "home_location_id",
+                  "type": "string",
+                  "displayAs": "string",
+                  "order": 100018,
+                  "title": "home_location_id",
+                  "allowSearch": false,
+                  "alignContent": "left",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
                 }
               ],
               "allowHTMLByDefault": false,
@@ -2809,13 +3021,13 @@
               "frame": {
                 "showTitle": true,
                 "showDescription": true,
-                "title": "Global platform status",
+                "title": "Global turbine status",
                 "description": "Status of all turbines both with and without faults"
               }
             }
           },
           "position": {
-            "x": 3,
+            "x": 0,
             "y": 11,
             "width": 3,
             "height": 5
@@ -2823,12 +3035,12 @@
         },
         {
           "widget": {
-            "name": "707dba5a",
+            "name": "eb2c9934",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "0aff856e",
+                  "datasetName": "5b753ffe",
                   "fields": [
                     {
                       "name": "count(maintenance_type)",
@@ -2866,8 +3078,10 @@
                 }
               },
               "frame": {
-                "title": "Distribution of Maintenance Activity Types",
-                "showTitle": true
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Maintenance Activity type Breakdown",
+                "description": "Level of maintenance activity"
               }
             }
           },
@@ -2978,7 +3192,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "1124505b",
+                  "datasetName": "e94523f9",
                   "fields": [
                     {
                       "name": "model",
@@ -4255,7 +4469,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "1124505b",
+                  "datasetName": "e94523f9",
                   "fields": [
                     {
                       "name": "lat",
@@ -4266,17 +4480,12 @@
                       "expression": "`long`"
                     },
                     {
-                      "name": "ship",
-                      "expression": "`ship`"
+                      "name": "designator",
+                      "expression": "`designator`"
                     },
                     {
-                      "name": "homeport",
-                      "expression": "`homeport`"
-                    }
-                  ],
-                  "filters": [
-                    {
-                      "expression": "`turbine_id` IN (`turbine_id`) OR TRUE"
+                      "name": "home_location",
+                      "expression": "`home_location`"
                     }
                   ],
                   "disaggregated": true
@@ -4299,12 +4508,12 @@
                 },
                 "extra": [
                   {
-                    "fieldName": "ship",
-                    "displayName": "ship"
+                    "fieldName": "designator",
+                    "displayName": "designator"
                   },
                   {
-                    "fieldName": "homeport",
-                    "displayName": "homeport"
+                    "fieldName": "home_location",
+                    "displayName": "home_location"
                   }
                 ]
               }

@@ -1,0 +1,18 @@
+resources:
+  pipelines:
+    pdm_pipeline:
+      name: "pdm_${var.demo_type}_pipeline"
+      configuration:
+        catalog: ${var.catalog}
+        demo: ${var.demo_type}
+        db: ${var.schema}
+      libraries:
+        - notebook:
+            path: ../src/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL.sql
+        - notebook:
+            path: ../src/01-Data-Ingestion/01.2-DLT-Navy-GasTurbine-SQL-UDF.py
+      development: true
+      photon: true
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true

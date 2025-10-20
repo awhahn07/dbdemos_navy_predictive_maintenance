@@ -1,0 +1,74 @@
+# Databricks Asset Bundle configuration, more info here: https://docs.databricks.com/en/dev-tools/bundles/settings.html
+bundle:
+  name: "pdm_demo"
+
+include:
+  - resources/*.yml
+  - resources/*/*.yml
+
+variables:
+  catalog:
+    description: "Unity Catalog name for the demo"
+    default: "public_sector"
+  
+  schema:
+    description: "Database/Schema name for the demo"
+    default: "predictive_maintenance_navy"
+    
+  demo_type:
+    description: "Type of demo (navy, DoD, pubsec)"
+    default: "navy"
+    
+  workspace_host:
+    description: "Databricks workspace URL"
+    
+  instance_pool_id:
+    description: "Instance pool ID for job clusters"
+    
+  user_email:
+    description: "User email for resource naming and permissions"
+    
+  volume_name:
+    description: "Volume name for data storage"
+    default: "raw_landing"
+    
+  experiment_name:
+    description: "MLflow experiment name"
+    default: "pubsec_predictive_maintenance"
+    
+  model_name:
+    description: "Model name for ML registry"
+    default: "predictive_maintenance_model"
+
+targets:
+  # The 'dev' target, for development purposes. This target is the default.
+  dev:
+    mode: development
+    default: true
+    variables:
+      workspace_host: "https://e2-demo-field-eng.cloud.databricks.com"
+      instance_pool_id: "0727-104344-hauls13-pool-uftxk0r6"
+      user_email: "andrew.hahn@databricks.com"
+      # schema: "predictive_maintenance_dev"
+    workspace:
+      host: https://e2-demo-field-eng.cloud.databricks.com 
+      #${var.workspace_host}
+      # root_path: /Users/andrew.hahn@databricks.com/.bundle/${bundle.name}/${bundle.target}
+    # run_as:
+      # This runs as andrew.hahn@databricks.com in production. We could also use a service principal here,
+      # see https://docs.databricks.com/dev-tools/bundles/permissions.html.
+      # user_name: andrew.hahn@databricks.com
+
+  # The 'prod' target, used for production deployment.
+  prod:
+    mode: production
+    variables:
+      workspace_host: "https://e2-demo-field-eng.cloud.databricks.com" 
+      instance_pool_id: "0727-104344-hauls13-pool-uftxk0r6"
+      user_email: "andrew.hahn@databricks.com"
+      # schema: "predictive_maintenance_prod"
+    workspace:
+      host: ${var.workspace_host}
+      root_path: /Users/${var.user_email}/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      user_name: ${var.user_email}

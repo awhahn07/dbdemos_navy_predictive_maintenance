@@ -244,7 +244,7 @@ display(optimal_transport_df.filter(optimal_transport_df['qty_shipped'] > 0))
 # COMMAND ----------
 
 parts = spark.read.table(f"{catalog}.{db}.parts_silver").select('stock_location', 'stock_location_id').distinct()
-designators = spark.read.table(f"{catalog}.{db}.ship_meta").select('designator').distinct().withColumn('designator_id', f.abs(f.hash('designator')))
+designators = spark.read.table(f"{catalog}.{db}.ship_meta_silver").select('designator').distinct().withColumn('designator_id', f.abs(f.hash('designator')))
 
 # rejoin actual designator and stock location values to the unique IDs
 optimal_transport_df = optimal_transport_df.join(parts, on='stock_location_id').join(designators, on='designator_id')

@@ -111,6 +111,10 @@
 -- MAGIC - **Automatic scaling**: Handles varying loads automatically  
 -- MAGIC - **Version management**: Easy model updates without pipeline changes
 -- MAGIC - **Monitoring**: Built-in tracking of prediction performance
+-- MAGIC
+
+-- COMMAND ----------
+
 
 CREATE OR REFRESH MATERIALIZED VIEW current_status_predictions (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL) ON VIOLATION DROP ROW,
@@ -154,8 +158,6 @@ SELECT * EXCEPT(m.row_number),
 -- MAGIC
 -- MAGIC ## 2/ Business Intelligence Gold Layer
 -- MAGIC
--- MAGIC <div><img src="https://github.com/databricks-demos/dbdemos-resources/raw/main/images/manufacturing/lakehouse-iot-turbine/lakehouse-manuf-iot-turbine-5.png" width="700px" style="float: right"/></div>
--- MAGIC
 -- MAGIC Our final gold layer combines ML predictions with business logic to create actionable insights.
 -- MAGIC
 -- MAGIC This table joins predictions with maintenance action recommendations, providing a complete view for:
@@ -163,6 +165,10 @@ SELECT * EXCEPT(m.row_number),
 -- MAGIC - **Maintenance crews**: Actionable recommendations and priorities
 -- MAGIC - **Business analysts**: Performance metrics and trend analysis
 -- MAGIC - **Executive dashboards**: High-level KPIs and alerts
+-- MAGIC
+-- MAGIC
+
+-- COMMAND ----------
 
 CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL) ON VIOLATION DROP ROW,
@@ -170,7 +176,7 @@ CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold (
 )
 COMMENT "Gold layer: Complete turbine status with predictions and maintenance recommendations - ready for business intelligence and dashboards"
 AS
-SELECT * EXCEPT(_rescued_data, m.fault) 
+SELECT * EXCEPT(m.fault) 
 FROM current_status_predictions p
 LEFT JOIN ${catalog}.${db}.maintenance_actions_silver m ON p.prediction = m.fault
 
@@ -196,4 +202,4 @@ LEFT JOIN ${catalog}.${db}.maintenance_actions_silver m ON p.prediction = m.faul
 -- MAGIC * Build dashboards using the gold layer data
 -- MAGIC
 -- MAGIC The inference pipeline integrates seamlessly with our existing data architecture while providing powerful ML capabilities for proactive maintenance decisions.
-
+-- MAGIC

@@ -13,34 +13,20 @@ resources:
           pipeline_task:
             pipeline_id: ${resources.pipelines.pdm_ingestion_pipeline.id}
             full_refresh: true
-        - task_key: start_inference_pipeline
+        - task_key: validate_model_endpoint
           depends_on:
             - task_key: start_ingestion_pipeline
+          notebook_task:
+            notebook_path: ../src/_resources/validate-model-endpoint.py
+        - task_key: start_inference_pipeline
+          depends_on:
+            - task_key: validate_model_endpoint
           pipeline_task:
             pipeline_id: ${resources.pipelines.pdm_inference_pipeline.id}
             full_refresh: true
-        - task_key: load_dbsql_and_ml_data
-          depends_on:
-            - task_key: start_inference_pipeline
-          notebook_task:
-            notebook_path: ../src/_resources/00-prep-data-db-sql.py
-            base_parameters:
-              reset_all_data: "false"
-        - task_key: create_feature_and_automl_run
-          depends_on:
-            - task_key: load_dbsql_and_ml_data
-          notebook_task:
-            notebook_path: ../src/04-Data-Science-ML/04.1-automl-iot-turbine-predictive-maintenance.py
-          job_cluster_key: "${var.demo_type}_cluster"
-        - task_key: register_ml_model
-          depends_on:
-            - task_key: create_feature_and_automl_run
-          notebook_task:
-            notebook_path: ../src/04-Data-Science-ML/04.2-AutoML-best-register-model.ipynb
-          #job_cluster_key: "${var.demo_type}_cluster"
         - task_key: optimize_supply_routing
           depends_on:
-            - task_key: register_ml_model
+            - task_key: start_inference_pipeline
           notebook_task:
             notebook_path: ../src/05-Supply-Optimization/05.1_Optimize_Transportation.py
           #job_cluster_key: "${var.demo_type}_cluster"

@@ -26,7 +26,7 @@
         "FROM current_status_predictions;"
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy_test"
+      "schema": "predictive_maintenance_navy"
     },
     {
       "name": "8f4e7b0e",
@@ -38,7 +38,7 @@
         "FROM sensor_bronze;"
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy_test"
+      "schema": "predictive_maintenance_navy"
     },
     {
       "name": "56022a56",
@@ -83,7 +83,7 @@
         }
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy_test"
+      "schema": "predictive_maintenance_navy"
     },
     {
       "name": "b03817ba",
@@ -96,7 +96,7 @@
         "GROUP BY ALL"
       ],
       "catalog": "public_sector",
-      "schema": "predictive_maintenance_navy_test"
+      "schema": "predictive_maintenance_navy"
     },
     {
       "name": "5b753ffe",

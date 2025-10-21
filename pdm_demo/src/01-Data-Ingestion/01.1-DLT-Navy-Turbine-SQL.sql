@@ -159,6 +159,8 @@
 
 -- COMMAND ----------
 
+
+
 -- COMMAND ----------
 
 -- DBTITLE 1,Wind Turbine sensor
@@ -212,7 +214,7 @@ SELECT * FROM ${catalog}.${db}.sensor_maintenance
 -- COMMAND ----------
 
 CREATE OR REFRESH MATERIALIZED VIEW parts_silver (
-  CONSTRAINT part_id_valid EXPECT (part_id IS not NULL) ON VIOLATION DROP ROW
+  CONSTRAINT part_id_valid EXPECT (NSN IS not NULL) ON VIOLATION DROP ROW
 )
 COMMENT "Turbine parts from our manufacturing system - Silver layer with data quality constraints"
 AS SELECT * EXCEPT(_rescued_data) FROM parts_bronze

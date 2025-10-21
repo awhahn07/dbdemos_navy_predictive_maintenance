@@ -74,7 +74,9 @@ targets:
 - **Cluster Configuration**: Uses `${var.instance_pool_id}` (environment-specific)
 
 #### `resources/pdm_pipeline.pipelines.yml`  
-- **Configuration**: Uses `${var.catalog}`, `${var.schema}`, `${var.demo_type}`
+- **Configuration**: Split into separate ingestion and inference pipelines
+- **Variables**: Both use `${var.catalog}`, `${var.schema}`, `${var.demo_type}`
+- **Dependencies**: Inference pipeline reads from ingestion pipeline silver tables
 - **Libraries**: Proper `notebook` type with `../src/` paths
 - **Pipeline Naming**: `pdm_${var.demo_type}_pipeline` (dynamic)
 
@@ -225,8 +227,82 @@ databricks bundle validate --target dev
 
 For questions about this DAB structure or deployment issues, reference this documentation and the validated configuration files in the `pdm_demo` directory.
 
+## Pipeline Architecture Modernization (Latest Update)
+
+### Delta Live Tables Pipeline Split
+
+**Objective:** Split the monolithic DLT pipeline into separate ingestion and inference pipelines for better scalability, maintainability, and operational efficiency.
+
+#### Changes Implemented:
+
+**1. Pipeline Separation:**
+- **Before:** Single `pdm_pipeline` handling both data ingestion and ML inference
+- **After:** Two specialized pipelines:
+  - `pdm_ingestion_pipeline`: Handles bronze and silver layer data processing
+  - `pdm_inference_pipeline`: Handles ML predictions and gold layer business intelligence
+
+**2. Ingestion Pipeline Enhancements:**
+- **File:** `01.1-DLT-Navy-Turbine-SQL.sql`
+- **Medallion Architecture:** Implemented proper `_bronze` and `_silver` table naming conventions
+- **Bronze Tables:** `sensor_bronze`, `historical_sensor_bronze`, `ship_meta_bronze`, `parts_bronze`, `maintenance_actions_bronze`
+- **Silver Tables:** `sensor_silver`, `historical_sensor_silver`, `ship_meta_silver`, `parts_silver`, `maintenance_actions_silver`
+- **Data Quality:** Added NOT NULL constraints and proper data validation across all layers
+- **Removed Dependencies:** Eliminated UDF notebook dependency (01.2-DLT-Navy-GasTurbine-SQL-UDF.py)
+
+**3. Inference Pipeline Implementation:**
+- **File:** `01.3-DLT-Navy-Inference.sql` (newly created)
+- **Modern ML Integration:** Replaced custom UDF with `ai_query()` for model serving endpoints
+- **Cross-Pipeline References:** Reads from ingestion pipeline silver tables using `${catalog}.${db}.table_name` syntax
+- **Gold Layer:** `current_status_predictions` and `ship_current_status_gold` tables for business intelligence
+- **Model Serving:** Integrated with 'navy_predictive_maintenance' endpoint for real-time predictions
+
+**4. Configuration Updates:**
+- **Pipeline Config:** `resources/pdm_pipeline.pipelines.yml` split into two pipeline definitions
+- **Job Orchestration:** `resources/pdm_job.job.yml` updated with sequential pipeline execution:
+  ```
+  init_data → start_ingestion_pipeline → start_inference_pipeline → downstream_tasks
+  ```
+- **Documentation:** Updated README.md, Quick-Commands.md, and this summary
+
+#### Benefits Achieved:
+
+**Operational Excellence:**
+- **Independent Scaling:** Each pipeline can be optimized for its specific workload
+- **Faster Development:** Teams can work on ingestion and inference independently
+- **Easier Debugging:** Isolated failure domains for better troubleshooting
+- **Flexible Scheduling:** Different refresh frequencies for ingestion vs inference
+
+**Modern ML Architecture:**
+- **Model Serving Integration:** Real-time inference using Databricks Model Serving endpoints
+- **No UDF Dependencies:** Simplified deployment and maintenance
+- **Cross-Environment Support:** Model endpoints can vary by environment (dev/staging/prod)
+- **Scalable Inference:** Serverless model serving with automatic scaling
+
+**Data Architecture:**
+- **Proper Medallion Architecture:** Clear bronze → silver → gold data progression  
+- **Data Quality Enforcement:** Comprehensive constraints and validation rules
+- **Business Intelligence Ready:** Gold layer optimized for dashboards and analytics
+- **Maintainable Codebase:** Clear separation of concerns between data processing and ML inference
+
+#### Technical Implementation:
+
+**Data Flow:**
+```
+Raw Data → Ingestion Pipeline (Bronze/Silver) → Inference Pipeline (Gold) → Business Intelligence
+```
+
+**Dependencies:**
+- Inference pipeline depends on ingestion pipeline completion
+- Cross-catalog table references maintain data lineage
+- Job orchestration ensures proper execution order
+
+**Configuration Management:**
+- Shared variables (`catalog`, `schema`, `demo_type`) across both pipelines
+- Environment-specific model serving endpoints
+- Consistent resource allocation and optimization settings
+
 ---
 
 **Status**: ✅ **PRODUCTION READY**  
-**Last Updated**: October 17, 2024  
-**Validation Status**: All tests passing, ready for deployment
+**Last Updated**: October 21, 2025  
+**Validation Status**: All tests passing, modern pipeline architecture implemented, ready for deployment

@@ -82,6 +82,6 @@ databricks --version
 ### File Locations
 - **Bundle Config**: `databricks.yml`
 - **Job Definition**: `resources/pdm_job.job.yml`  
-- **Pipeline Config**: `resources/pdm_pipeline.pipelines.yml`
+- **Pipeline Config**: `resources/pdm_pipeline.pipelines.yml` (split into ingestion and inference pipelines)
 - **Source Code**: `src/` directory
 - **Documentation**: `docs/` directory

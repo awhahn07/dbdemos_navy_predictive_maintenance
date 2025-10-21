@@ -92,12 +92,36 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install databricks-sdk==0.40.0
-# MAGIC dbutils.library.restartPython()
+# MAGIC %md
+# MAGIC # %pip install databricks-sdk==0.40.0
+# MAGIC # dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ../_resources/00-setup $reset_all_data=False 
+# MAGIC %md
+# MAGIC # %run ../_resources/00-setup $reset_all_data=False 
+
+# COMMAND ----------
+
+# MAGIC %run ../config
+
+# COMMAND ----------
+
+# MAGIC %run ../_resources/00-global-setup-v2
+
+# COMMAND ----------
+
+import mlflow 
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number, sha1, col, initcap, to_timestamp
+import pyspark.sql.functions as F
+from datetime import datetime
+
+dbutils.widgets.dropdown("reset_all_data", "false", ["true", "false"], "Reset all data")
+reset_all_data = dbutils.widgets.get("reset_all_data") == "true"
+
+DBDemos.setup_schema(catalog, db, reset_all_data, volume_name)
+volume_folder =  f"/Volumes/{catalog}/{db}/{volume_name}"
 
 # COMMAND ----------
 

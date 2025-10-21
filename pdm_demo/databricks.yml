@@ -63,7 +63,7 @@ targets:
   prod:
     mode: production
     variables:
-      workspace_host: "https://e2-demo-field-eng.cloud.databricks.com" 
+      workspace_host: "https://e2-demo-west.cloud.databricks.com/" 
       instance_pool_id: "0727-104344-hauls13-pool-uftxk0r6"
       user_email: "andrew.hahn@databricks.com"
       # schema: "predictive_maintenance_prod"

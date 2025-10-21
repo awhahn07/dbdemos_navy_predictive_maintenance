@@ -6,7 +6,7 @@ resources:
         - task_key: init_data
           notebook_task:
             notebook_path: ../src/_resources/01-load-data.py
-          job_cluster_key: "${var.demo_type}_cluster"
+          #job_cluster_key: "${var.demo_type}_cluster"
         - task_key: start_dlt_pipeline
           depends_on:
             - task_key: init_data
@@ -31,19 +31,19 @@ resources:
             - task_key: create_feature_and_automl_run
           notebook_task:
             notebook_path: ../src/04-Data-Science-ML/04.2-AutoML-best-register-model.ipynb
-          job_cluster_key: "${var.demo_type}_cluster"
+          #job_cluster_key: "${var.demo_type}_cluster"
         - task_key: optimize_supply_routing
           depends_on:
             - task_key: register_ml_model
           notebook_task:
             notebook_path: ../src/05-Supply-Optimization/05.1_Optimize_Transportation.py
-          job_cluster_key: "${var.demo_type}_cluster"
+          #job_cluster_key: "${var.demo_type}_cluster"
         - task_key: AI_Work_Parts_Orders
           depends_on:
             - task_key: optimize_supply_routing
           notebook_task:
             notebook_path: ../src/07-Generate-tickets/AI_work_orders.ipynb
-          job_cluster_key: "${var.demo_type}_cluster"
+          #job_cluster_key: "${var.demo_type}_cluster"
       job_clusters:
         - job_cluster_key: "${var.demo_type}_cluster"
           new_cluster:

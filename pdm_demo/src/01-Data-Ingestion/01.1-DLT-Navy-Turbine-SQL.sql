@@ -159,13 +159,6 @@
 
 -- COMMAND ----------
 
--- DBTITLE 1,Turbine metadata
--- CREATE OR REFRESH STREAMING TABLE turbine ( 
---   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL) 
--- )
--- COMMENT "Turbine details, with location, wind turbine model type etc"
--- SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/turbine/", "json", map("cloudFiles.inferColumnTypes" , "true"));
-
 -- COMMAND ----------
 
 -- DBTITLE 1,Wind Turbine sensor
@@ -173,7 +166,7 @@ CREATE OR REFRESH STREAMING TABLE sensor_bronze (
   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL),
   CONSTRAINT correct_energy EXPECT (energy IS NOT NULL and energy > 0) ON VIOLATION DROP ROW
 )
-COMMENT "Raw sensor data coming from json files ingested in incremental with Auto Loader: vibration, energy produced etc. 1 point every X sec per sensor."
+COMMENT "Bronze layer: Raw sensor data from turbine sensors ingested with Auto Loader - vibration, energy produced etc. 1 point every X sec per sensor."
 AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/incoming_data", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
@@ -182,26 +175,26 @@ AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/incoming_dat
 CREATE OR REFRESH STREAMING TABLE historical_sensor_bronze (
   CONSTRAINT correct_schema EXPECT (_rescued_data IS NULL)
 )
-COMMENT "Turbine status to be used as label in our predictive maintenance model (to know which turbine is potentially faulty)"
+COMMENT "Bronze layer: Historical turbine sensor data for tracking turbine operational status over time"
 AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/historical_sensor_data", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Ship metadata
-CREATE OR REFRESH STREAMING TABLE ship_meta 
-COMMENT "Ship to turbine Meta_Data mapping"
+CREATE OR REFRESH STREAMING TABLE ship_meta_bronze 
+COMMENT "Bronze layer: Ship to turbine metadata mapping - raw data from source system"
 AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/meta_${demo}", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
 -- DBTITLE 1,Parts and stock information
 CREATE OR REFRESH STREAMING TABLE parts_bronze 
-COMMENT "Turbine parts from our manufacturing system"
+COMMENT "Bronze layer: Turbine parts data from manufacturing system - raw inventory and parts information"
 AS SELECT * FROM cloud_files("/Volumes/${catalog}/${db}/raw_landing/parts_${demo}", "parquet", map("cloudFiles.inferColumnTypes" , "true"))
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW maintenance_actions AS
+CREATE OR REFRESH MATERIALIZED VIEW maintenance_actions_bronze AS
 SELECT * FROM ${catalog}.${db}.sensor_maintenance
 
 -- COMMAND ----------
@@ -218,8 +211,11 @@ SELECT * FROM ${catalog}.${db}.sensor_maintenance
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW parts_silver AS
-SELECT * EXCEPT(_rescued_data) FROM parts_bronze
+CREATE OR REFRESH MATERIALIZED VIEW parts_silver (
+  CONSTRAINT part_id_valid EXPECT (part_id IS not NULL) ON VIOLATION DROP ROW
+)
+COMMENT "Turbine parts from our manufacturing system - Silver layer with data quality constraints"
+AS SELECT * EXCEPT(_rescued_data) FROM parts_bronze
 
 -- COMMAND ----------
 
@@ -227,7 +223,7 @@ CREATE OR REFRESH MATERIALIZED VIEW historical_sensor_silver (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL)  ON VIOLATION DROP ROW,
   CONSTRAINT timestamp_valid EXPECT (hourly_timestamp IS not NULL)  ON VIOLATION DROP ROW
 )
-COMMENT "Hourly sensor stats, used to describe signal and detect anomalies"
+COMMENT "Silver layer: Hourly aggregated historical sensor statistics - cleaned and validated data"
 AS
 SELECT turbine_id,
       abnormal_sensor, 
@@ -253,7 +249,7 @@ CREATE OR REFRESH MATERIALIZED VIEW sensor_silver (
   CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL)  ON VIOLATION DROP ROW,
   CONSTRAINT timestamp_valid EXPECT (hourly_timestamp IS not NULL)  ON VIOLATION DROP ROW
 )
-COMMENT "Hourly sensor stats, used to describe signal and detect anomalies"
+COMMENT "Silver layer: Hourly aggregated current sensor statistics - cleaned and validated data"
 AS
 SELECT turbine_id,
       date_trunc('hour', from_unixtime(timestamp)) AS hourly_timestamp, 
@@ -271,6 +267,22 @@ SELECT turbine_id,
       percentile_approx(sensor_E, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_E,
       percentile_approx(sensor_F, array(0.1, 0.3, 0.6, 0.8, 0.95)) as percentiles_sensor_F
   FROM sensor_bronze GROUP BY hourly_timestamp, turbine_id
+
+-- COMMAND ----------
+
+CREATE OR REFRESH MATERIALIZED VIEW ship_meta_silver (
+  CONSTRAINT turbine_id_valid EXPECT (turbine_id IS not NULL) ON VIOLATION DROP ROW
+)
+COMMENT "Ship to turbine Meta_Data mapping - Silver layer with data quality constraints"
+AS SELECT * EXCEPT(_rescued_data) FROM ship_meta_bronze
+
+-- COMMAND ----------
+
+CREATE OR REFRESH MATERIALIZED VIEW maintenance_actions_silver (
+  CONSTRAINT fault_valid EXPECT (fault IS not NULL) ON VIOLATION DROP ROW
+)
+COMMENT "Maintenance actions mapping - Silver layer with data quality constraints"  
+AS SELECT * FROM maintenance_actions_bronze
 
 -- COMMAND ----------
 
@@ -328,24 +340,24 @@ SELECT * FROM historical_sensor_silver
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW current_status_predictions 
-COMMENT "Navy gas turbine last status based on model prediction"
-AS
-WITH latest_metrics AS (
-  SELECT *, ROW_NUMBER() OVER(PARTITION BY turbine_id, hourly_timestamp ORDER BY hourly_timestamp DESC) AS row_number 
-  FROM sensor_silver
-  INNER JOIN ship_meta t USING (turbine_id)
-)
-SELECT * EXCEPT(m.row_number), 
-    predict_maintenance(hourly_timestamp, avg_energy, std_sensor_A, std_sensor_B, std_sensor_C, std_sensor_D, std_sensor_E, std_sensor_F, percentiles_sensor_A, percentiles_sensor_B, percentiles_sensor_C, percentiles_sensor_D, percentiles_sensor_E, percentiles_sensor_F) as prediction 
-  FROM latest_metrics m
-  WHERE m.row_number=1
+-- CREATE OR REFRESH MATERIALIZED VIEW current_status_predictions 
+-- COMMENT "Navy gas turbine last status based on model prediction"
+-- AS
+-- WITH latest_metrics AS (
+--   SELECT *, ROW_NUMBER() OVER(PARTITION BY turbine_id, hourly_timestamp ORDER BY hourly_timestamp DESC) AS row_number 
+--   FROM sensor_silver
+--   INNER JOIN ship_meta_bronze t USING (turbine_id)
+-- )
+-- SELECT * EXCEPT(m.row_number), 
+--     predict_maintenance(hourly_timestamp, avg_energy, std_sensor_A, std_sensor_B, std_sensor_C, std_sensor_D, std_sensor_E, std_sensor_F, percentiles_sensor_A, percentiles_sensor_B, percentiles_sensor_C, percentiles_sensor_D, percentiles_sensor_E, percentiles_sensor_F) as prediction 
+--   FROM latest_metrics m
+--   WHERE m.row_number=1
 
 -- COMMAND ----------
 
-CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold AS
-SELECT * EXCEPT(_rescued_data, m.fault) FROM current_status_predictions
-LEFT JOIN maintenance_actions m ON prediction = m.fault
+-- CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold AS
+-- SELECT * EXCEPT(_rescued_data, m.fault) FROM current_status_predictions
+-- LEFT JOIN maintenance_actions_bronze m ON prediction = m.fault
 
 -- COMMAND ----------
 

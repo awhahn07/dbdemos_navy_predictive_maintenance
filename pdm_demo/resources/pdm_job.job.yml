@@ -7,15 +7,21 @@ resources:
           notebook_task:
             notebook_path: ../src/_resources/01-load-data.py
           #job_cluster_key: "${var.demo_type}_cluster"
-        - task_key: start_dlt_pipeline
+        - task_key: start_ingestion_pipeline
           depends_on:
             - task_key: init_data
           pipeline_task:
-            pipeline_id: ${resources.pipelines.pdm_pipeline.id}
+            pipeline_id: ${resources.pipelines.pdm_ingestion_pipeline.id}
+            full_refresh: true
+        - task_key: start_inference_pipeline
+          depends_on:
+            - task_key: start_ingestion_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pdm_inference_pipeline.id}
             full_refresh: true
         - task_key: load_dbsql_and_ml_data
           depends_on:
-            - task_key: start_dlt_pipeline
+            - task_key: start_inference_pipeline
           notebook_task:
             notebook_path: ../src/_resources/00-prep-data-db-sql.py
             base_parameters:

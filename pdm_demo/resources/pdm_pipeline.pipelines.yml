@@ -1,7 +1,7 @@
 resources:
   pipelines:
-    pdm_pipeline:
-      name: "pdm_${var.demo_type}_pipeline"
+    pdm_ingestion_pipeline:
+      name: "pdm_${var.demo_type}_ingestion_pipeline"
       configuration:
         catalog: ${var.catalog}
         demo: ${var.demo_type}
@@ -9,8 +9,21 @@ resources:
       libraries:
         - notebook:
             path: ../src/01-Data-Ingestion/01.1-DLT-Navy-Turbine-SQL.sql
+      development: true
+      photon: true
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      
+    pdm_inference_pipeline:
+      name: "pdm_${var.demo_type}_inference_pipeline"
+      configuration:
+        catalog: ${var.catalog}
+        demo: ${var.demo_type}
+        db: ${var.schema}
+      libraries:
         - notebook:
-            path: ../src/01-Data-Ingestion/01.2-DLT-Navy-GasTurbine-SQL-UDF.py
+            path: ../src/01-Data-Ingestion/01.3-DLT-Navy-Inference.sql
       development: true
       photon: true
       catalog: ${var.catalog}

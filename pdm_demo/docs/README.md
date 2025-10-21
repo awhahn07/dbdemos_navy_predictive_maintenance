@@ -21,7 +21,7 @@ This directory contains documentation for the Navy Predictive Maintenance Databr
 ### Key Files Modified
 - `databricks.yml` - Main bundle configuration with variables
 - `resources/pdm_job.job.yml` - Job workflow definition  
-- `resources/pdm_pipeline.pipelines.yml` - DLT pipeline configuration
+- `resources/pdm_pipeline.pipelines.yml` - DLT pipeline configurations (ingestion and inference)
 
 ### Project Structure
 ```

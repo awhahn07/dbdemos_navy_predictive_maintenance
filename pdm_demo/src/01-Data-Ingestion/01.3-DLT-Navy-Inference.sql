@@ -176,7 +176,7 @@ CREATE OR REFRESH MATERIALIZED VIEW ship_current_status_gold (
 )
 COMMENT "Gold layer: Complete turbine status with predictions and maintenance recommendations - ready for business intelligence and dashboards"
 AS
-SELECT * EXCEPT(_rescued_data, m.fault) 
+SELECT * EXCEPT(m.fault) 
 FROM current_status_predictions p
 LEFT JOIN ${catalog}.${db}.maintenance_actions_silver m ON p.prediction = m.fault
 

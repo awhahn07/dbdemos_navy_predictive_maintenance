@@ -8,8 +8,16 @@ This directory contains documentation for the Navy Predictive Maintenance Databr
 **Complete technical summary of DAB structure cleanup and implementation**
 
 - **What it covers**: Comprehensive overview of all changes made to convert the legacy project into a proper DAB
-- **Key sections**: Issues resolved, technical changes, validation results, deployment workflow
+- **Key sections**: Issues resolved, technical changes, validation results, deployment workflow  
 - **Use case**: Reference for understanding the DAB structure, troubleshooting, and future maintenance
+- **Latest Update**: Job workflow optimization with model endpoint validation (Oct 21, 2025)
+
+### [Job-Workflow-Changes.md](./Job-Workflow-Changes.md) 
+**Summary of job workflow optimization and model endpoint validation**
+
+- **What it covers**: Recent changes to job configuration, validation system, and retry logic
+- **Key features**: Model endpoint validation, retry mechanisms, streamlined workflow
+- **Use case**: Quick reference for understanding validation features and troubleshooting endpoint issues
 
 ### Quick Reference
 
@@ -20,8 +28,9 @@ This directory contains documentation for the Navy Predictive Maintenance Databr
 
 ### Key Files Modified
 - `databricks.yml` - Main bundle configuration with variables
-- `resources/pdm_job.job.yml` - Job workflow definition  
+- `resources/pdm_job.job.yml` - Job workflow definition with model endpoint validation
 - `resources/pdm_pipeline.pipelines.yml` - DLT pipeline configurations (ingestion and inference)
+- `src/_resources/validate-model-endpoint.py` - Model serving endpoint validation notebook
 
 ### Project Structure
 ```

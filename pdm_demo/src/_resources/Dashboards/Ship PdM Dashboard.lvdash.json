@@ -157,7 +157,7 @@
       "queryLines": [
         "WITH homes AS (\n",
         "  SELECT DISTINCT designator, home_location \n",
-        "  FROM ship_meta\n",
+        "  FROM ship_meta_silver\n",
         ")\n",
         "SELECT qty_shipped, type, stock_location, shipment_recommendations.designator, homes.home_location \n",
         "FROM shipment_recommendations\n",
@@ -3187,48 +3187,6 @@
         },
         {
           "widget": {
-            "name": "90acfcea",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "e94523f9",
-                  "fields": [
-                    {
-                      "name": "model",
-                      "expression": "`model`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "model",
-                  "displayName": "model"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "showDescription": true,
-                "title": "Model - IOT platform - asset status",
-                "description": "Failure mode"
-              }
-            }
-          },
-          "position": {
-            "x": 2,
-            "y": 2,
-            "width": 2,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
             "name": "edfea2aa",
             "queries": [
               {
@@ -3268,9 +3226,9 @@
             }
           },
           "position": {
-            "x": 4,
+            "x": 3,
             "y": 2,
-            "width": 2,
+            "width": 3,
             "height": 4
           }
         },
@@ -3312,7 +3270,7 @@
           "position": {
             "x": 0,
             "y": 2,
-            "width": 2,
+            "width": 3,
             "height": 4
           }
         },
@@ -4533,6 +4491,9 @@
   "uiSettings": {
     "theme": {
       "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "genieSpace": {
+      "isEnabled": false
     }
   }
 }

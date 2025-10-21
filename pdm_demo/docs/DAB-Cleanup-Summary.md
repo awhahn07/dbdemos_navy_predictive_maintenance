@@ -301,8 +301,83 @@ Raw Data → Ingestion Pipeline (Bronze/Silver) → Inference Pipeline (Gold) �
 - Environment-specific model serving endpoints
 - Consistent resource allocation and optimization settings
 
+## Job Workflow Optimization (October 21, 2025)
+
+### 7. **Job Configuration Modernization** ✅ COMPLETED
+- **Problem**: Job workflow included outdated tasks that were no longer valid and lacked model endpoint validation
+- **Solution**: Streamlined workflow with modern validation practices and removed deprecated components
+- **Impact**: More reliable pipeline execution with early failure detection
+
+#### Changes Made:
+
+**Removed Outdated Tasks:**
+- `load_dbsql_and_ml_data` - No longer needed in current architecture
+- `create_feature_and_automl_run` - Replaced by direct model serving endpoint usage  
+- `register_ml_model` - Model registration handled separately
+
+**Added Model Endpoint Validation:**
+- New `validate_model_endpoint` task positioned between ingestion and inference pipelines
+- Validates `navy_predictive_maintenance` endpoint before processing
+- Fails fast if model serving is unavailable, preventing downstream errors
+
+**Updated Task Dependencies:**
+```yaml
+# New streamlined workflow:
+init_data → start_ingestion_pipeline → validate_model_endpoint → start_inference_pipeline → optimize_supply_routing → AI_Work_Parts_Orders
+```
+
+### 8. **Model Endpoint Validation System** ✅ IMPLEMENTED
+- **Created**: `src/_resources/validate-model-endpoint.py` - Comprehensive validation notebook
+- **Features**: Multi-method validation, retry logic, smart success criteria
+- **Integration**: Seamlessly integrated into job workflow as validation gate
+
+#### Validation Methods:
+
+**1. REST API Validation**
+- Tests endpoint with sample data from `turbine_training_dataset`
+- Validates payload format and response structure
+- Handles data type conversion (percentiles arrays, null values)
+
+**2. AI Query Validation** 
+- Tests using `ai_query()` function (same as inference pipeline)
+- Ensures exact compatibility with production usage
+- Validates SQL integration
+
+**3. Health Check Validation**
+- Checks endpoint availability and ready state
+- Validates endpoint configuration and permissions
+- Comprehensive error reporting
+
+#### Retry Logic for Cold Start Scenarios:
+
+**Configuration:**
+- **Max Retries**: 3 attempts with configurable delay
+- **Retry Delay**: 30 seconds between attempts (allows warm-up)
+- **Success Criteria**: 0 failures OR ≥60% success rate
+- **Timeout Handling**: 30-second request timeouts
+
+**Benefits:**
+- Handles model serving cold start scenarios gracefully
+- Reduces false failures from endpoint warm-up delays
+- Maintains strict validation while allowing operational flexibility
+
+**Example Flow:**
+```
+Attempt 1: [40% success] → Wait 30s → Attempt 2: [80% success] → ✅ PASS
+```
+
+#### Files Modified:
+- `resources/pdm_job.job.yml` - Updated task definitions and dependencies
+- `src/_resources/validate-model-endpoint.py` - New comprehensive validation notebook
+
+#### Validation Results:
+- **Job Configuration**: Valid YAML syntax, proper task dependencies
+- **Notebook Integration**: Proper variable resolution, compatible with DAB structure  
+- **Model Endpoint**: Compatible with existing `navy_predictive_maintenance` endpoint
+- **Error Handling**: Comprehensive exception handling and retry mechanisms
+
 ---
 
 **Status**: ✅ **PRODUCTION READY**  
 **Last Updated**: October 21, 2025  
-**Validation Status**: All tests passing, modern pipeline architecture implemented, ready for deployment
+**Validation Status**: All tests passing, modern pipeline architecture implemented with robust endpoint validation, ready for deployment

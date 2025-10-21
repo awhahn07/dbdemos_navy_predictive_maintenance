@@ -54,7 +54,7 @@ coordinates = {row['stock_location_id']: (row['lat'], row['long']) for row in un
 
 # COMMAND ----------
 
-ship_meta = spark.read.table(f'{catalog}.{db}.ship_meta')
+ship_meta = spark.read.table(f'{catalog}.{db}.ship_meta_silver')
 unique_home_locations = ship_meta.select('home_location', 'home_location_id','lat', 'long').distinct()
 
 #### 
